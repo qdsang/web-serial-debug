@@ -85,7 +85,7 @@ handleResize()
       <Splitpanes class="default-theme" @resize="handleSplitResize">
         <Pane :size="layoutConfig.splitPaneSize" class="w75">
           <el-tabs type="card" class="lv-card lv-tabs" addable v-model="layoutConfig.leftActiveTab" @tab-click="handleTabChange">
-            <el-tab-pane label="命令行">
+            <el-tab-pane label="控制台">
               <SerialLog />
             </el-tab-pane>
             <el-tab-pane label="姿态" lazy>

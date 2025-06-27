@@ -29,7 +29,7 @@
 
     <!-- 数据字段 -->
     <div class="status">
-      <div v-for="field in props.data?.fields" :key="field.id">
+      <div v-for="field in fieldData" :key="field.key">
         {{ field.label }}: {{ field.value || 'N/A' }} {{ field.unit }}
       </div>
     </div>
@@ -41,14 +41,9 @@ import { NodeResizer } from '@vue-flow/node-resizer'
 import { NodeToolbar } from '@vue-flow/node-toolbar'
 import { Handle } from '@vue-flow/core'
 import { ElButton } from 'element-plus'
+import { computed } from 'vue'
+import { useFieldStore } from '../../../store/fieldStore'
 import './style.css'
-
-interface Field {
-  id: string
-  label: string
-  value?: string
-  unit?: string
-}
 
 interface Action {
   label: string
@@ -66,7 +61,7 @@ const props = defineProps<{
   selected: boolean
   data: {
     label?: string
-    fields?: Field[]
+    fields?: string[]
     actions?: Action[]
     handles?: Handle[]
   }
@@ -75,6 +70,21 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update', id: string, value: string): void
 }>()
+
+const fieldStore = useFieldStore()
+
+const fieldData = computed(() => {
+  if (!props.data?.fields) return []
+  return props.data.fields.map(key => {
+    const field = fieldStore.fields.find(f => f.key === key)
+    return field ? {
+      key: field.key,
+      label: field.name,
+      value: field.value,
+      unit: field.unit
+    } : null
+  }).filter(Boolean)
+})
 
 function updateValue(value: string) {
   emit('update', props.id, value)

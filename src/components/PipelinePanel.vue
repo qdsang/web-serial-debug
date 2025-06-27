@@ -1,32 +1,32 @@
 <template>
   <div class="pipeline-panel">
     <div class="toolbar">
-      <el-button-group>
+      <el-button-group size="small">
         <el-button @click="onAddNode('fuel')">燃料罐</el-button>
         <el-button @click="onAddNode('oxidizer')">氧化剂罐</el-button>
         <el-button @click="onAddNode('pressurant')">增压气罐</el-button>
         <el-button @click="onAddNode('engine')">推进器</el-button>
       </el-button-group>
-      <el-button-group style="margin-left: 12px">
+      <el-button-group size="small" style="margin-left: 12px">
         <el-button @click="onAddNode('valve')">阀门</el-button>
         <el-button @click="onAddNode('check_valve')">单向阀</el-button>
         <el-button @click="onAddNode('regulator')">调压阀</el-button>
       </el-button-group>
-      <el-button-group style="margin-left: 12px">
+      <el-button-group size="small" style="margin-left: 12px">
         <el-button @click="onAddNode('pressure')">压力传感器</el-button>
         <el-button @click="onAddNode('temperature')">温度传感器</el-button>
         <el-button @click="onAddNode('flow')">流量传感器</el-button>
       </el-button-group>
-      <el-button-group style="margin-left: 12px">
-        <el-button type="primary" @click="showNodeConfig">添加自定义组件</el-button>
+      <el-button-group size="small" style="margin-left: 12px">
+        <el-button type="primary" @click="showNodeConfig">添加组件</el-button>
       </el-button-group>
-      <el-button-group style="margin-left: 12px">
+      <el-button-group size="small" style="margin-left: 12px">
         <el-button @click="onCopy" :disabled="!selectedNode">复制</el-button>
         <el-button @click="onPaste" :disabled="!copiedNode">粘贴</el-button>
         <el-button @click="onUndo" :disabled="!canUndo">撤销</el-button>
         <el-button @click="onRedo" :disabled="!canRedo">重做</el-button>
       </el-button-group>
-      <el-button-group style="margin-left: 12px">
+      <el-button-group size="small" style="margin-left: 12px">
         <el-button @click="onEditEdge" :disabled="!selectedEdge">编辑连接线</el-button>
       </el-button-group>
     </div>
@@ -249,7 +249,7 @@ const defaultDemo = [
   {
     id: 'pressure-2',
     type: 'pressure',
-    position: { x: 100, y: 250 },
+    position: { x: 100, y: 350 },
     data: { label: 'P2', value: '2.0' }
   },
   {
@@ -526,6 +526,19 @@ onMounted(() => {
   background-color: var(--el-bg-color);
 }
 
+:deep(.vue-flow__minimap) {
+  background-color: var(--el-bg-color);
+}
+
+:deep(.vue-flow__minimap-mask) {
+  fill: var(--el-fill-color-light);
+}
+
+:deep(.vue-flow__minimap-node) {
+  fill: var(--el-color-primary-light-9);
+  stroke: var(--el-color-primary);
+}
+
 .custom-node {
   padding: 10px;
   border-radius: 4px;
@@ -557,4 +570,12 @@ onMounted(() => {
 .custom-node.sensor.flow {
   border-color: #67c23a;
 }
+
+.custom-node :deep(.vue-flow__resize-control) {
+  display: none;
+}
+.custom-node:hover :deep(.vue-flow__resize-control){
+  display: block;
+}
+
 </style>

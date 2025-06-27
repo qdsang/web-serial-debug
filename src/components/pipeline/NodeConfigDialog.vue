@@ -1,50 +1,52 @@
 <template>
   <el-dialog v-model="dialogVisible" :title="title" width="600px">
     <el-form :model="form" label-width="100px">
+      <el-form-item label="组件类型">
+        <div class="template-grid">
+          <div
+            v-for="option in templateOptions"
+            :key="option.value"
+            class="template-card"
+            :class="{ active: form.template === option.value }"
+            @click="form.template = option.value"
+          >
+            <div class="template-icon">
+              <el-icon><component :is="option.icon" /></el-icon>
+            </div>
+            <div class="template-content">
+              <div class="template-title">{{ option.label }}</div>
+              <div class="template-desc">{{ option.description }}</div>
+            </div>
+          </div>
+        </div>
+      </el-form-item>
       <el-form-item label="组件名称">
         <el-input v-model="form.label" placeholder="请输入组件名称" />
       </el-form-item>
-      <el-form-item label="组件类型">
-        <el-select v-model="form.template" placeholder="选择组件模板">
-          <el-option label="容器类" value="tank">
-            <div class="template-option">
-              <div>容器类</div>
-              <div class="template-desc">适用于储罐、气瓶等存储容器</div>
-            </div>
-          </el-option>
-          <el-option label="阀门类" value="valve">
-            <div class="template-option">
-              <div>阀门类</div>
-              <div class="template-desc">适用于各类阀门控制元件</div>
-            </div>
-          </el-option>
-          <el-option label="传感器类" value="sensor">
-            <div class="template-option">
-              <div>传感器类</div>
-              <div class="template-desc">适用于压力、温度等传感器</div>
+      <el-form-item label="数据字段">
+        <el-select
+          v-model="form.fields"
+          multiple
+          filterable
+          placeholder="请选择数据字段"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="option in fieldOptions"
+            :key="option.name"
+            :label="option.label"
+            :value="option.name"
+          >
+            <div class="field-option">
+              <div class="field-option-title">{{ option.label }}</div>
+              <div class="field-option-desc">
+                <el-tag size="small" class="field-type-tag">{{ option.type }}</el-tag>
+                <span v-if="option.unit" class="field-unit">{{ option.unit }}</span>
+                <div class="field-description">{{ option.description }}</div>
+              </div>
             </div>
           </el-option>
         </el-select>
-      </el-form-item>
-      <el-form-item label="数据字段">
-        <el-card class="data-fields">
-          <template #header>
-            <div class="card-header">
-              <span>字段列表</span>
-              <el-button type="primary" link @click="addField">添加字段</el-button>
-            </div>
-          </template>
-          <div v-for="(field, index) in form.fields" :key="index" class="field-item">
-            <el-input v-model="field.name" placeholder="字段名称" style="width: 120px" />
-            <el-select v-model="field.type" placeholder="类型" style="width: 100px">
-              <el-option label="数值" value="number" />
-              <el-option label="文本" value="text" />
-              <el-option label="布尔" value="boolean" />
-            </el-select>
-            <el-input v-model="field.unit" placeholder="单位" style="width: 80px" />
-            <el-button type="danger" link @click="removeField(index)">删除</el-button>
-          </div>
-        </el-card>
       </el-form-item>
       <el-form-item label="连接桩">
         <el-card class="handles">
@@ -94,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import {
   ElDialog,
   ElForm,
@@ -103,8 +105,15 @@ import {
   ElSelect,
   ElOption,
   ElButton,
-  ElCard
+  ElCard,
+  ElIcon
 } from 'element-plus'
+import {
+  Box,
+  Switch,
+  DataLine
+} from '@element-plus/icons-vue'
+import { useFieldStore } from '../../store/fieldStore'
 
 const props = defineProps<{
   modelValue: boolean
@@ -122,7 +131,7 @@ const title = ref(props.editData ? '编辑组件' : '添加组件')
 const form = reactive({
   label: '',
   template: '',
-  fields: [] as Array<{ name: string; type: string; unit: string }>,
+  fields: [] as Array<string>,
   handles: [] as Array<{ id: string; type: string; position: string }>,
   actions: [] as Array<{ label: string; value: string }>
 })
@@ -135,20 +144,6 @@ watch(() => props.modelValue, (val) => {
 watch(() => dialogVisible.value, (val) => {
   emit('update:modelValue', val)
 })
-
-// 添加数据字段
-function addField() {
-  form.fields.push({
-    name: '',
-    type: 'number',
-    unit: ''
-  })
-}
-
-// 删除数据字段
-function removeField(index: number) {
-  form.fields.splice(index, 1)
-}
 
 // 添加连接桩
 function addHandle() {
@@ -182,16 +177,87 @@ function handleConfirm() {
   emit('confirm', { ...form })
   dialogVisible.value = false
 }
-</script>
 
+const templateOptions = [
+  {
+    value: 'tank',
+    label: '容器类',
+    icon: 'DataLine',
+    description: '适用于储罐、气瓶等存储容器'
+  },
+  {
+    value: 'valve',
+    label: '阀门类',
+    icon: 'Box',
+    description: '适用于各类阀门控制元件'
+  },
+  {
+    value: 'sensor',
+    label: '传感器类',
+    icon: 'Switch',
+    description: '适用于压力、温度等传感器'
+  }
+]
+
+const fieldStore = useFieldStore()
+
+const fieldOptions = computed(() => fieldStore.fields.map(field => ({
+  name: field.key,
+  label: field.name,
+  description: field.description,
+  unit: field.unit,
+  type: field.dataType
+})))
+
+</script>
 <style scoped>
-.template-option {
-  padding: 4px 0;
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.template-card {
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.template-card:hover {
+  border-color: var(--el-color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.template-card.active {
+  border-color: var(--el-color-primary);
+  background-color: var(--el-color-primary-light-9);
+}
+
+.template-icon {
+  font-size: 24px;
+  color: var(--el-color-primary);
+}
+
+.template-content {
+  flex: 1;
+}
+
+.template-title {
+  font-weight: bold;
+  margin-bottom: 4px;
 }
 
 .template-desc {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  line-height: 1.4;
 }
 
 .card-header {
@@ -213,5 +279,20 @@ function handleConfirm() {
 .handles,
 .actions {
   margin-top: 8px;
+}
+
+.field-option {
+  padding: 8px 0;
+}
+
+.field-option-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.field-option-desc {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.4;
 }
 </style>

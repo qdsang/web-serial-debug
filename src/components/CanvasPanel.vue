@@ -246,11 +246,11 @@ const viewItem = (item: CanvasItem) => {
   flex: 1;
   position: relative;
   overflow: auto;
-  padding: 10px;
+  padding: 0;
 }
 
 .canvas-item {
-  background: var(--el-bg-color);
+  background: var(--el-bg-color-overlay);
   border: 1px solid var(--el-border-color);
   border-radius: 3px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
@@ -282,7 +282,7 @@ const viewItem = (item: CanvasItem) => {
 
 :deep(.dark) {
   .canvas-item {
-    background-color: #141619;
+    // background-color: #141619;
     border: 1px solid #202226;
   }
   .item-header:hover {

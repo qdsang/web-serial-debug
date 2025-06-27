@@ -102,6 +102,7 @@ onUnmounted(() => {
               <el-checkbox v-model="fieldStore.columnVisibility[key]" @change="fieldStore.toggleColumnVisibility()">
                 {{ key === 'key' ? 'Key' :
                    key === 'name' ? '字段名' :
+                   key === 'unit' ? '单位' :
                    key === 'dataType' ? '数据类型' :
                    key === 'keyAddr' ? '内存地址' :
                    key === 'keySize' ? '内存大小' :
@@ -158,15 +159,9 @@ onUnmounted(() => {
         </template>
       </el-table-column>
 
-      <el-table-column v-if="fieldStore.columnVisibility.keyAddr" label="内存地址" sortable min-width="100">
+      <el-table-column v-if="fieldStore.columnVisibility.unit" label="单位" min-width="60">
         <template #default="{ row }">
-          <el-input v-model="row.keyAddr" size="small" @change="updateField" />
-        </template>
-      </el-table-column>
-
-      <el-table-column v-if="fieldStore.columnVisibility.keySize" label="内存大小" sortable min-width="100">
-        <template #default="{ row }">
-          <el-input v-model="row.keySize" size="small" @change="updateField" />
+          <el-input v-model="row.unit" size="small" @change="updateField" />
         </template>
       </el-table-column>
 
@@ -184,6 +179,18 @@ onUnmounted(() => {
       <el-table-column v-if="fieldStore.columnVisibility.description" label="描述" min-width="150">
         <template #default="{ row }">
           <el-input v-model="row.description" size="small" @change="updateField" />
+        </template>
+      </el-table-column>
+
+      <el-table-column v-if="fieldStore.columnVisibility.keyAddr" label="内存地址" sortable min-width="100">
+        <template #default="{ row }">
+          <el-input v-model="row.keyAddr" size="small" @change="updateField" />
+        </template>
+      </el-table-column>
+
+      <el-table-column v-if="fieldStore.columnVisibility.keySize" label="内存大小" sortable min-width="100">
+        <template #default="{ row }">
+          <el-input v-model="row.keySize" size="small" @change="updateField" />
         </template>
       </el-table-column>
 

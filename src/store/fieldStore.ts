@@ -5,6 +5,7 @@ interface DataField {
   id: number
   key: string
   name: string
+  unit: string
   description: string
   keyAddr: number
   keySize: number
@@ -16,12 +17,12 @@ interface DataField {
   max: number | null
   lastUpdate: number
   updateCount: number
-  isEditing: boolean
 }
 
 interface ColumnVisibility {
   key: boolean
   name: boolean
+  unit: boolean
   dataType: boolean
   description: boolean
   keyAddr: boolean
@@ -39,6 +40,7 @@ const createFieldItem = (id: number, key: string, value: any, dataType?: 'number
     id: id,
     key,
     name: key,
+    unit: '',
     keyAddr: 0,
     keySize: 0,
     dataType: dataType || 'number',
@@ -49,8 +51,7 @@ const createFieldItem = (id: number, key: string, value: any, dataType?: 'number
     min: typeof value === 'number' ? value : null,
     max: typeof value === 'number' ? value : null,
     lastUpdate: Date.now(),
-    updateCount: 1,
-    isEditing: false
+    updateCount: 1
   }
 }
 
@@ -67,6 +68,7 @@ export const useFieldStore = defineStore('field', {
     columnVisibility: useLocalStorage('config.columnVisibility', {
       key: true,
       name: false,
+      unit: false,
       keyAddr: false,
       keySize: false,
       dataType: true,
