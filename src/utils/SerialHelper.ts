@@ -106,7 +106,7 @@ export class SerialHelper {
       }
 
       if (options.showNewline) {
-        parts.push('\n');
+        parts.push('\r\n');
       } else {
         parts.push('');
       }

@@ -66,6 +66,8 @@ const handleDeviceAuthorize = async () => {
     case 'authorizedBluetooth':
       device = await DeviceBluetooth.request()
       break
+    case 'mock':
+      device = await DeviceMockIMU.request()
     case 'websocket':
       break
     case 'webstlink':
@@ -93,17 +95,10 @@ const connectDevice = async (device: Device) => {
   }
   let port
   try {
-    if (device.type === 'serialport') {
-      port = await DeviceSerialPort.connectDevice(device)
-    } else if (device.type ==='mock') {
-      port = await DeviceMockIMU.connectDevice(device)
-    } else if (device.type ==='usb') {
-      port = await DeviceWebUSB.connectDevice(device)
-    } else if (device.type ==='bluetooth') {
-      port = await DeviceBluetooth.connectDevice(device)
-    }
+    // 使用新的标准接口方法
+    port = await device.connect(serialConfig.value)
   } catch (error) {
-    ElMessage.error('串口连接失败：' + error)
+    ElMessage.error('设备连接失败：' + error)
     console.log(error)
   }
 

@@ -101,14 +101,14 @@ handleResize()
             <el-tab-pane label="流程图">
               <PipelinePanel />
             </el-tab-pane>
-            <el-tab-pane label="画板" lazy>
-              <CanvasPanel />
-            </el-tab-pane>
             <el-tab-pane label="模拟" lazy>
               <Sim />
             </el-tab-pane>
             <el-tab-pane label="火箭" lazy>
               <ChartRocket />
+            </el-tab-pane>
+            <el-tab-pane label="画板" lazy>
+              <CanvasPanel />
             </el-tab-pane>
           </el-tabs>
         </Pane>

@@ -52,11 +52,11 @@ yarn preview
 
 ## 参考
 
-https://github.com/devanlai/webstlink
-https://v2.tauri.app/zh-cn/start/
-https://github.com/mateosolinho/AeroTelemProc_VidData/tree/main
-https://github.com/Serial-Studio/Serial-Studio
-https://github.com/klonyyy/MCUViewer
+https://github.com/devanlai/webstlink  
+https://v2.tauri.app/zh-cn/start/  
+https://github.com/mateosolinho/AeroTelemProc_VidData/tree/main  
+https://github.com/Serial-Studio/Serial-Studio  
+https://github.com/klonyyy/MCUViewer  
 
 
 ## 许可证

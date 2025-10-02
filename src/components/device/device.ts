@@ -1,7 +1,7 @@
-
 import { ref } from 'vue'
+import type { IDevice } from './IDevice'
 
-export interface Device {
+export interface Device extends IDevice {
   id: string
   title: string
   type: string
