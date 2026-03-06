@@ -21,6 +21,14 @@ try { particleFire.install( { THREE: THREE } ); } catch (e) { }
 import { WaterRocketPhysics } from '../utils/WaterRocketPhysics'
 import { MultiStageRocketPhysics } from '../utils/MultiStageRocketPhysics'
 
+interface Props {
+  readonly?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  readonly: false
+})
+
 const container = ref<HTMLDivElement | null>(null)
 const waterRocketPhysics = WaterRocketPhysics.getInstance()
 const multiStageRocketPhysics = MultiStageRocketPhysics.getInstance()
@@ -366,6 +374,43 @@ const renderKatex = (text: string) => {
   })
 }
 
+const getConfig = () => {
+  return {
+    temperature: temperature.value,
+    windSpeed: windSpeed.value,
+    windDirection: windDirection.value,
+    angle: angle.value,
+    isMultiStage: isMultiStage.value
+  }
+}
+
+const setConfig = (config: Record<string, any>) => {
+  if (config.temperature !== undefined) {
+    temperature.value = config.temperature
+    handleTemperatureChange()
+  }
+  if (config.windSpeed !== undefined) {
+    windSpeed.value = config.windSpeed
+    handleWindSpeedChange()
+  }
+  if (config.windDirection !== undefined) {
+    windDirection.value = config.windDirection
+    handleWindDirectionChange()
+  }
+  if (config.angle !== undefined) {
+    angle.value = config.angle
+    handleAngleChange()
+  }
+  if (config.isMultiStage !== undefined) {
+    isMultiStage.value = config.isMultiStage
+  }
+}
+
+defineExpose({
+  getConfig,
+  setConfig
+})
+
 onMounted(() => {
   initScene()
   animate()
@@ -384,7 +429,7 @@ onUnmounted(() => {
 <template>
   <div class="chart-3d-container">
     <div ref="container" class="canvas-container"></div>
-    <div class="control-panel">
+    <div class="control-panel" v-if="!readonly">
       <div class="parameters">
         <h3>环境参数</h3>
         <div class="parameter-item">

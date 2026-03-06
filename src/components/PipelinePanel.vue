@@ -1,6 +1,6 @@
 <template>
   <div class="pipeline-panel">
-    <div class="toolbar">
+    <div class="toolbar" v-if="!readonly">
       <el-button-group size="small">
         <el-button @click="onAddNode('fuel')">燃料罐</el-button>
         <el-button @click="onAddNode('oxidizer')">氧化剂罐</el-button>
@@ -117,8 +117,8 @@
         <CustomNode v-bind="nodeProps" @update="updateComponentValue" />
       </template>
       <Background pattern-color="#aaa" :gap="20" />
-      <Controls />
-      <MiniMap />
+      <Controls v-if="!readonly" />
+      <MiniMap v-if="!readonly" />
     </VueFlow>
   </div>
 </template>
@@ -148,6 +148,14 @@ import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/node-resizer/dist/style.css'
 import '@vue-flow/controls/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
+
+interface Props {
+  readonly?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  readonly: false
+})
 
 const {
   nodes,
@@ -479,6 +487,27 @@ function updateUndoRedoState() {
   canUndo.value = history.past.length > 0
   canRedo.value = history.future.length > 0
 }
+
+const getConfig = () => {
+  return {
+    nodes: JSON.parse(JSON.stringify(nodes)),
+    edges: JSON.parse(JSON.stringify(edges))
+  }
+}
+
+const setConfig = (config: Record<string, any>) => {
+  if (config.nodes) {
+    setNodes(config.nodes)
+  }
+  if (config.edges) {
+    setEdges(config.edges)
+  }
+}
+
+defineExpose({
+  getConfig,
+  setConfig
+})
 
 // 初始化默认演示
 onMounted(() => {

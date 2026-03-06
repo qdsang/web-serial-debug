@@ -1,18 +1,24 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { ConfigManager } from '../utils/ConfigManager'
 import ChartPanel from './ChartPanel.vue'
 import DataTable from './DataTable.vue'
 import ChartIMU from './ChartIMU.vue'
+import PipelinePanel from './PipelinePanel.vue'
+import Sim from '../sim/Sim.vue'
+import ChartRocket from './ChartRocket.vue'
 import TimeRangeControl from './TimeRangeControl.vue'
+import DashboardManager from './DashboardManager.vue'
 import { useDark } from '@vueuse/core'
 import { GridLayout, GridItem } from 'grid-layout-plus'
 import { useDataStore } from '../store/dataStore'
+import { useDashboardStore } from '../store/dashboardStore'
 import { EventCenter, EventNames } from '../utils/EventCenter'
 
 const configManager = ConfigManager.getInstance()
 const canvasConfig = configManager.useConfig('canvas')
 const dataStore = useDataStore()
+const dashboardStore = useDashboardStore()
 const eventCenter = EventCenter.getInstance()
 
 // 监听数据更新事件
@@ -65,6 +71,24 @@ const componentConfigs = {
     resizable: true,
     title: '3D视图'
   },
+  'pipeline': {
+    width: 12,
+    height: 8,
+    resizable: true,
+    title: '流程图'
+  },
+  'sim': {
+    width: 12,
+    height: 8,
+    resizable: true,
+    title: '模拟发射'
+  },
+  'rocket': {
+    width: 12,
+    height: 8,
+    resizable: true,
+    title: '水火箭'
+  },
   'row': {
     width: 24,
     height: 1,
@@ -94,7 +118,10 @@ const isDark = useDark()
 const componentMap = {
   'chart': ChartPanel,
   'table': DataTable,
-  '3d': ChartIMU
+  '3d': ChartIMU,
+  'pipeline': PipelinePanel,
+  'sim': Sim,
+  'rocket': ChartRocket
 } as Record<string, any>
 
 const addComponent = (type: string) => {
@@ -159,12 +186,20 @@ const viewItem = (item: CanvasItem) => {
 <template>
   <div class="canvas-panel">
     <div class="toolbar">
-      <el-button-group class="tool-group">
-        <el-button type="primary" size="small" @click="addComponent('row')">添加行</el-button>
-        <el-button type="primary" size="small" @click="addComponent('chart')">添加图表</el-button>
-        <el-button type="primary" size="small" @click="addComponent('table')">添加数据表</el-button>
-        <el-button type="primary" size="small" @click="addComponent('3d')">添加3D视图</el-button>
-      </el-button-group>
+      <div class="toolbar-left">
+        <el-button-group class="tool-group">
+          <el-button type="primary" size="small" @click="addComponent('row')">添加行</el-button>
+          <el-button type="primary" size="small" @click="addComponent('chart')">图表</el-button>
+          <el-button type="primary" size="small" @click="addComponent('table')">数据表</el-button>
+          <el-button type="primary" size="small" @click="addComponent('3d')">3D姿态</el-button>
+          <el-button type="primary" size="small" @click="addComponent('pipeline')">流程图</el-button>
+          <el-button type="primary" size="small" @click="addComponent('sim')">模拟发射</el-button>
+          <el-button type="primary" size="small" @click="addComponent('rocket')">水火箭</el-button>
+        </el-button-group>
+      </div>
+      <div class="toolbar-right">
+        <DashboardManager />
+      </div>
     </div>
     <div class="canvas-container" :class="{ 'dark': isDark }">
       <grid-layout
@@ -235,6 +270,17 @@ const viewItem = (item: CanvasItem) => {
   padding: 12px;
   border-bottom: 1px solid var(--el-border-color);
   background: var(--el-bg-color-overlay);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toolbar-left {
+  flex: 1;
+}
+
+.toolbar-right {
+  flex-shrink: 0;
 }
 
 .tool-group {

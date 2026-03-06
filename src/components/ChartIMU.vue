@@ -18,6 +18,14 @@ try { particleFire.install( { THREE: THREE } ); } catch (e) { }
 
 import { EventCenter, EventNames } from '../utils/EventCenter'
 
+interface Props {
+  readonly?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  readonly: false
+})
+
 const eventCenter = EventCenter.getInstance()
 
 const container = ref<HTMLDivElement | null>(null)
@@ -324,6 +332,24 @@ const uploadModel = () => {
   fileInput.value?.click()
 }
 
+const getConfig = () => {
+  return {
+    modelType: currentModel.value
+  }
+}
+
+const setConfig = (config: Record<string, any>) => {
+  if (config.modelType) {
+    currentModel.value = config.modelType
+    createModel(currentModel.value)
+  }
+}
+
+defineExpose({
+  getConfig,
+  setConfig
+})
+
 onMounted(() => {
   initScene()
   animate()
@@ -350,7 +376,7 @@ onUnmounted(() => {
       <div>Pitch: {{ pitch.toFixed(2) }}°</div>
       <div>Roll: {{ roll.toFixed(2) }}°</div>
       <div>Yaw: {{ yaw.toFixed(2) }}°</div>
-      <div class="model-controls">
+      <div class="model-controls" v-if="!readonly">
         <el-button class="model-switch" @click="switchModel" size="small">
           切换模型
         </el-button>

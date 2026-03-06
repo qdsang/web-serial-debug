@@ -6,6 +6,14 @@ import { SceneManager } from './SceneManager.js';
 import { RocketPhysics } from './RocketPhysics.js';
 import katex from 'katex';
 
+interface Props {
+  readonly?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  readonly: false
+})
+
 const container = ref<HTMLDivElement | null>(null)
 let animationFrameId: number
 const sceneManager = new SceneManager();
@@ -152,6 +160,24 @@ const handleResize = () => {
   }
 }
 
+const getConfig = () => {
+  return {
+    started: started.value,
+    currentCamera: cameras[currentCameraIndex.value]
+  }
+}
+
+const setConfig = (config: Record<string, any>) => {
+  if (config.currentCamera) {
+    setCamera(config.currentCamera)
+  }
+}
+
+defineExpose({
+  getConfig,
+  setConfig
+})
+
 onMounted(() => {
   initScene()
   window.addEventListener('resize', handleResize)
@@ -171,7 +197,7 @@ onUnmounted(() => {
 <template>
   <div class="sim">
     <div class="tex" :style="{ opacity: formulaOpacity }"></div>
-    <div class="controls">
+    <div class="controls" v-if="!readonly">
       <button @click="started = true">开始</button>
       <button @click="nextCamera">下一个摄像头</button>
       <button @click="setCamera('main')">主摄像头</button>

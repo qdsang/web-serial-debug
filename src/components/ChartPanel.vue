@@ -6,6 +6,18 @@ import { ConfigManager } from '../utils/ConfigManager'
 import LineChart from './charts/LineChart.vue'
 import { EventCenter, EventNames } from '../utils/EventCenter'
 
+interface Props {
+  readonly?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  readonly: false
+})
+
+const emit = defineEmits<{
+  'update:charts': [charts: any[]]
+}>()
+
 const eventCenter = EventCenter.getInstance()
 const fieldStore = useFieldStore()
 
@@ -80,12 +92,12 @@ const updateChartData = (data: any) => {
     let dataNum = 0
     const newData = [chart.timestamps, ...chart.fields.map((field, index) => {
       const value = data[field]
-      let d1 = null
+      let d1: number | undefined = undefined
       if (typeof value === 'number') {
         dataNum++
         d1 = value
       }
-      chart.data[index + 1].push(d1)
+      chart.data[index + 1].push(d1 ?? undefined)
       return chart.data[index + 1]
     })]
     if (dataNum == 0) return
@@ -126,6 +138,32 @@ const removeChart = (chartId: number) => {
   saveChartsConfig()
 }
 
+const getConfig = () => {
+  return {
+    charts: charts.value.map(chart => ({
+      id: chart.id,
+      name: chart.name,
+      fields: chart.fields
+    }))
+  }
+}
+
+const setConfig = (config: Record<string, any>) => {
+  if (config.charts) {
+    charts.value = []
+    config.charts.forEach((chartData: any) => {
+      const chart = createChart(chartData.name)
+      chart.id = chartData.id
+      chartData.fields?.forEach((field: string) => addField(chart.id, field))
+    })
+  }
+}
+
+defineExpose({
+  getConfig,
+  setConfig
+})
+
 onMounted(() => {
   loadChartsConfig()
   eventCenter.on(EventNames.DATA_UPDATE, updateChartData)
@@ -138,7 +176,7 @@ onUnmounted(() => {
 
 <template>
   <div class="chart-panel">
-    <div class="chart-controls">
+    <div class="chart-controls" v-if="!readonly">
       <el-button @click="createChart('新图表')" type="primary" size="small">
         添加图表
       </el-button>
@@ -151,6 +189,7 @@ onUnmounted(() => {
             size="small"
             placeholder="图表名称"
             class="chart-name-input"
+            :readonly="readonly"
             @change="handleTitleChange"
           />
           <el-select
@@ -160,6 +199,7 @@ onUnmounted(() => {
             placeholder="选择字段"
             size="small"
             style="min-width: 200px"
+            :disabled="readonly"
             @change="handleFieldsChange(chart)"
           >
             <el-option
@@ -170,6 +210,7 @@ onUnmounted(() => {
             />
           </el-select>
           <el-button
+            v-if="!readonly"
             @click="removeChart(chart.id)"
             type="danger"
             size="small"
@@ -178,6 +219,7 @@ onUnmounted(() => {
             <el-icon><Delete /></el-icon>
           </el-button>
           <el-button
+            v-if="!readonly"
             @click="resetChartData(chart.id)"
             style="margin-left: 0"
             type="warning"
