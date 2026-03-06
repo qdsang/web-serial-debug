@@ -1,6 +1,6 @@
 import { ElMessage } from 'element-plus'
-import { authorizedDevices, type Device } from './device'
-import type { IDevice, DeviceInfo } from './IDevice'
+import { authorizedDevices, type Device } from '../types'
+import type { IDevice, DeviceInfo } from '../types'
 
 export class WebUSBDevice implements IDevice {
   id: string
@@ -21,7 +21,6 @@ export class WebUSBDevice implements IDevice {
   }
 
   static getDeviceId(port: USBDevice): string {
-    // 基于设备的唯一属性生成ID
     return `usb_${port.manufacturerName || 'unknown'}_${port.productName || 'unknown'}_${port.serialNumber || 'noserial'}`
   }
 
@@ -46,7 +45,7 @@ export class WebUSBDevice implements IDevice {
       }
       
       const port = await navigator.usb.requestDevice({
-        filters: [] // 允许所有设备
+        filters: []
       })
       const device = new WebUSBDevice(port)
       return device as unknown as Device
@@ -64,7 +63,6 @@ export class WebUSBDevice implements IDevice {
     reader: ReadableStreamDefaultReader 
   } | null> {
     try {
-      // WebUSB需要具体的端点配置，这里只是一个示例框架
       ElMessage.warning('WebUSB连接功能正在开发中')
       console.log('Connecting to WebUSB device:', this)
       return null
@@ -76,7 +74,6 @@ export class WebUSBDevice implements IDevice {
   }
 
   async disconnect(): Promise<void> {
-    // WebUSB断开连接逻辑
     console.log('Disconnecting WebUSB device', this)
   }
 
@@ -88,13 +85,11 @@ export class WebUSBDevice implements IDevice {
     }
   }
   
-  // 实现实例方法以满足接口要求
   async request(): Promise<IDevice | null> {
     return WebUSBDevice.request()
   }
 }
 
-// 为了保持向后兼容性，导出旧的函数名
 export const init = () => WebUSBDevice.init()
 export const request = () => WebUSBDevice.request()
 export const connect = (device: Device) => {

@@ -1,6 +1,6 @@
 import { ElMessage } from 'element-plus'
-import type { Device } from './device'
-import type { IDevice, DeviceInfo } from './IDevice'
+import { authorizedDevices, type Device } from '../types'
+import type { IDevice, DeviceInfo } from '../types'
 
 export class BluetoothDeviceImpl implements IDevice {
   id: string
@@ -23,7 +23,6 @@ export class BluetoothDeviceImpl implements IDevice {
   }
 
   static async init(): Promise<void> {
-    // Bluetooth设备通常需要用户主动配对，不需要初始化
   }
 
   static async request(): Promise<Device | null> {
@@ -52,7 +51,6 @@ export class BluetoothDeviceImpl implements IDevice {
     reader: ReadableStreamDefaultReader 
   } | null> {
     try {
-      // Bluetooth连接需要特定的服务和特征配置，这里只是一个示例框架
       ElMessage.warning('蓝牙连接功能正在开发中')
       console.log('Connecting to Bluetooth device:', this)
       return null
@@ -64,7 +62,6 @@ export class BluetoothDeviceImpl implements IDevice {
   }
 
   async disconnect(): Promise<void> {
-    // Bluetooth断开连接逻辑
     console.log('Disconnecting Bluetooth device', this)
   }
 
@@ -74,13 +71,11 @@ export class BluetoothDeviceImpl implements IDevice {
     }
   }
   
-  // 实现实例方法以满足接口要求
   async request(): Promise<IDevice | null> {
     return BluetoothDeviceImpl.request()
   }
 }
 
-// 为了保持向后兼容性，导出旧的函数名
 export const init = () => BluetoothDeviceImpl.init()
 export const request = () => BluetoothDeviceImpl.request()
 export const connect = (device: Device) => {

@@ -1,7 +1,7 @@
 import { ref } from 'vue'
-import { authorizedDevices, type Device } from './device'
+import { authorizedDevices, type Device } from '../types'
 import { TimerManager } from '../../utils/TimerManager'
-import type { IDevice, DeviceInfo } from './IDevice'
+import type { IDevice, DeviceInfo } from '../types'
 
 export class MockIMUDevice implements IDevice {
   id: string = 'mock_imu'
@@ -53,7 +53,6 @@ export class MockIMUDevice implements IDevice {
     let pitch = 0.0, roll = 0.0, yaw = 0.0
     await this.sleep(1000 - (Date.now() % 1000))
     this.timerManager.startTimer(this.SIMULATION_TIMER_ID, () => {
-      // 模拟数据
       pitch += Math.random() * 0.4 - 0.2
       roll += Math.random() * 0.4 - 0.1
       yaw += Math.random() * 0.4 - 0
@@ -95,11 +94,9 @@ export class MockIMUDevice implements IDevice {
   }
 }
 
-// 添加设备到已授权设备列表
 const mockDeviceInstance = MockIMUDevice.getInstance()
 authorizedDevices.value.push(mockDeviceInstance as unknown as Device)
 
-// 为了保持向后兼容性，导出旧的函数名
 export const request = () => mockDeviceInstance.request()
 export const connect = () => mockDeviceInstance.connect()
 export const disconnect = () => mockDeviceInstance.disconnect()

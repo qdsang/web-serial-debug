@@ -5,11 +5,11 @@ import { ConfigManager } from '../utils/ConfigManager'
 import { ScriptManager } from '../utils/ScriptManager'
 import { EventCenter, EventNames } from '../utils/EventCenter'
 
-import { authorizedDevices, type Device } from './device/device'
-import * as DeviceSerialPort from './device/serialport'
-import * as DeviceMockIMU from './device/mock_imu'
-import * as DeviceWebUSB from './device/webusb'
-import * as DeviceBluetooth from './device/bluetooth'
+import { authorizedDevices, type Device, type IDevice } from '../devices'
+import * as DeviceSerialPort from '../devices/serialport'
+import * as DeviceMockIMU from '../devices/mock-imu'
+import * as DeviceWebUSB from '../devices/webusb'
+import * as DeviceBluetooth from '../devices/bluetooth'
 
 const configManager = ConfigManager.getInstance()
 const serialConfig = configManager.useConfig('serial')

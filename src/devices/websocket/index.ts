@@ -1,7 +1,7 @@
 import { ElMessage } from 'element-plus'
-import type { Device } from './device'
+import type { Device } from '../types'
 
-interface WebSocketDevice {
+export interface WebSocketDevice {
   id: string
   title: string
   type: string

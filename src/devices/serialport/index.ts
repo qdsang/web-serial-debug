@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { authorizedDevices, type Device } from './device'
+import { authorizedDevices, type Device } from '../types'
 import { ConfigManager } from '../../utils/ConfigManager'
-import type { IDevice, DeviceInfo } from './IDevice'
+import type { IDevice, DeviceInfo } from '../types'
 
 const configManager = ConfigManager.getInstance()
 const serialConfig = configManager.useConfig('serial')
@@ -14,38 +14,23 @@ export class SerialPortDevice implements IDevice {
   port: SerialPort
 
   private static KNOWN_DEVICES = [
-    // Arduino 系列
     { name: 'Arduino UNO', vendorId: '2341', productId: '0043' },
     { name: 'Arduino Mega', vendorId: '2341', productId: '0010' },
     { name: 'Arduino Nano', vendorId: '0403', productId: '6001' },
     { name: 'ATmega32U4', vendorId: '2341', productId: '8036' },
-    
-    // Silicon Labs CP210x 系列
     { name: 'CP2102/CP2102N', vendorId: '10c4', productId: 'ea60' },
-    
-    // FTDI 系列
     { name: 'FT2232H', vendorId: '0403', productId: '6010' },
     { name: 'FTDI Basic', vendorId: '0403', productId: '6001' },
-    
-    // WCH CH340 系列
     { name: 'CH340', vendorId: '1a86', productId: '7523' },
     { name: 'CH9102', vendorId: '1a86', productId: '55d4' },
-    
-    // Prolific 系列
     { name: 'PL2303', vendorId: '067b', productId: '2303' },
     { name: 'PL2303HX', vendorId: '067b', productId: '2303' },
-    
-    // Espressif 系列
     { name: 'ESP USB_SERIAL_JTAG', vendorId: '303a', productId: '1001' },
     { name: 'ESP USB Bridge', vendorId: '303a', productId: '1002' },
     { name: 'ESP32-S2 USB CDC', vendorId: '303a', productId: '0002' },
     { name: 'ESP32-S3 USB CDC', vendorId: '303a', productId: '0009' },
-    
-    // QinHeng Electronics
     { name: 'CH9102F', vendorId: '1a86', productId: '55d4' },
     { name: 'CH340G', vendorId: '1a86', productId: '7523' },
-    
-    // STMicroelectronics
     { name: 'STM32 Virtual COM Port', vendorId: '0483', productId: '5740' },
     { name: 'STM32 USB CDC', vendorId: '0483', productId: '5740' }
   ]
@@ -141,20 +126,17 @@ export class SerialPortDevice implements IDevice {
 
   getInfo(): DeviceInfo {
     const info = this.port.getInfo()
-    
     return {
       vendorId: info.usbVendorId,
       productId: info.usbProductId
     }
   }
   
-  // 实现实例方法以满足接口要求
   async request(): Promise<IDevice | null> {
     return SerialPortDevice.request()
   }
 }
 
-// 为了保持向后兼容性，导出旧的函数名
 export const init = () => SerialPortDevice.init()
 export const request = () => SerialPortDevice.request()
 export const connect = (device: Device, config?: SerialOptions) => {
@@ -162,7 +144,6 @@ export const connect = (device: Device, config?: SerialOptions) => {
   return serialDevice.connect(config)
 }
 export const disconnect = async () => {
-  // 这里需要特殊处理，因为可能有多个串口设备
   console.log("Disconnecting serial port device")
 }
 export const getInfo = (device: Device) => {
