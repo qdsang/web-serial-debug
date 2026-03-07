@@ -92,17 +92,3 @@ export class WebUSBDevice implements IDevice {
 
 export const init = () => WebUSBDevice.init()
 export const request = () => WebUSBDevice.request()
-export const connect = (device: Device) => {
-  const usbDevice = new WebUSBDevice(device.port as USBDevice)
-  return usbDevice.connect()
-}
-export const disconnect = async () => {
-  console.log("Disconnecting WebUSB device")
-}
-export const getInfo = (device: Device) => {
-  const usbDevice = new WebUSBDevice(device.port as USBDevice)
-  return usbDevice.getInfo()
-}
-export const makeDevice = (port: USBDevice) => new WebUSBDevice(port)
-export const getDeviceId = (port: USBDevice) => WebUSBDevice.getDeviceId(port)
-export const getDeviceTitle = (port: USBDevice) => WebUSBDevice.getDeviceTitle(port)

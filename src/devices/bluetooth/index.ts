@@ -78,17 +78,3 @@ export class BluetoothDeviceImpl implements IDevice {
 
 export const init = () => BluetoothDeviceImpl.init()
 export const request = () => BluetoothDeviceImpl.request()
-export const connect = (device: Device) => {
-  const bluetoothDevice = new BluetoothDeviceImpl(device.port as BluetoothDevice)
-  return bluetoothDevice.connect()
-}
-export const disconnect = async () => {
-  console.log("Disconnecting Bluetooth device")
-}
-export const getInfo = (device: Device) => {
-  const bluetoothDevice = new BluetoothDeviceImpl(device.port as BluetoothDevice)
-  return bluetoothDevice.getInfo()
-}
-export const makeDevice = (port: BluetoothDevice) => new BluetoothDeviceImpl(port)
-export const getDeviceId = (port: BluetoothDevice) => BluetoothDeviceImpl.getDeviceId(port)
-export const getDeviceTitle = (port: BluetoothDevice) => BluetoothDeviceImpl.getDeviceTitle(port)

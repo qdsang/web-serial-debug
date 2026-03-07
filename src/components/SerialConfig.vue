@@ -11,6 +11,7 @@ import * as DeviceSerialPort from '../devices/serialport'
 import * as DeviceMockIMU from '../devices/mock-imu'
 import * as DeviceWebUSB from '../devices/webusb'
 import * as DeviceBluetooth from '../devices/bluetooth'
+import * as DeviceWebSocket from '../devices/websocket'
 import { DesktopSerialDevice } from '../devices/desktop'
 
 const configManager = ConfigManager.getInstance()
@@ -89,6 +90,7 @@ const handleDeviceAuthorize = async () => {
       device = await DeviceMockIMU.request()
       break
     case 'websocket':
+      device = await DeviceWebSocket.request(wsConfig.value.url)
       break
     case 'webstlink':
     case 'script':
@@ -148,11 +150,12 @@ const disconnectSerial = async () => {
     console.log(error)
   }
   isConnected.value = false
-  // selectedDeviceId.value = ''
 
   try {
-    await DeviceSerialPort.disconnect()
-    await DeviceMockIMU.disconnect()
+    const device = authorizedDevices.value.find(d => d.id === selectedDeviceId.value)
+    if (device) {
+      await device.disconnect()
+    }
     ElMessage.success('设备已断开')
   } catch (error) {
     ElMessage.error('断开设备失败：' + error)
@@ -218,6 +221,7 @@ onMounted(() => {
   eventCenter.on(EventNames.SERIAL_SEND, handleSerialSend)
   DeviceSerialPort.init()
   DeviceWebUSB.init()
+  DeviceWebSocket.init()
 })
 
 onUnmounted(() => {

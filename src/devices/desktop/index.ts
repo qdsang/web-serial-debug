@@ -106,12 +106,3 @@ export class DesktopSerialDevice implements IDevice {
 
 export const init = () => {}
 export const request = () => Promise.resolve<DesktopSerialDevice | null>(null)
-export const connect = (device: any, config?: any) => {
-  const desktopDevice = new DesktopSerialDevice('', config?.baudRate || 115200)
-  return desktopDevice.connect(config)
-}
-export const disconnect = async () => {}
-export const getInfo = (device: any) => ({})
-export const makeDevice = (portName: string) => new DesktopSerialDevice(portName)
-export const getDeviceId = (portName: string) => `desktop-serial-${portName}`
-export const getDeviceTitle = (portName: string) => `串口 (${portName})`

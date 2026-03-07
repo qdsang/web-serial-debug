@@ -139,17 +139,3 @@ export class SerialPortDevice implements IDevice {
 
 export const init = () => SerialPortDevice.init()
 export const request = () => SerialPortDevice.request()
-export const connect = (device: Device, config?: SerialOptions) => {
-  const serialDevice = new SerialPortDevice(device.port as SerialPort)
-  return serialDevice.connect(config)
-}
-export const disconnect = async () => {
-  console.log("Disconnecting serial port device")
-}
-export const getInfo = (device: Device) => {
-  const serialDevice = new SerialPortDevice(device.port as SerialPort)
-  return serialDevice.getInfo()
-}
-export const makeDevice = (port: SerialPort) => new SerialPortDevice(port)
-export const getDeviceId = (port: SerialPort) => SerialPortDevice.getDeviceId(port)
-export const getDeviceTitle = (port: SerialPort) => SerialPortDevice.getDeviceTitle(port)

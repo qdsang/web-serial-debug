@@ -290,17 +290,3 @@ class WebSocketReader {
 
 export const init = () => WebSocketDevice.init()
 export const request = (url?: string) => WebSocketDevice.request(url || wsConfig.value.url)
-export const connect = (device: Device, config?: WebSocketConfig) => {
-  const wsDevice = new WebSocketDevice(device.port as WebSocket)
-  return wsDevice.connect(config)
-}
-export const disconnect = async () => {
-  console.log('Disconnecting WebSocket device')
-}
-export const getInfo = (device: Device) => {
-  const wsDevice = new WebSocketDevice(device.port as WebSocket)
-  return wsDevice.getInfo()
-}
-export const makeDevice = (port: WebSocket, url?: string) => new WebSocketDevice(port, url)
-export const getDeviceId = (port: WebSocket, url?: string) => WebSocketDevice.getDeviceId(port, url || '')
-export const getDeviceTitle = (port: WebSocket, url?: string) => WebSocketDevice.getDeviceTitle(port, url || '')

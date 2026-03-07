@@ -97,8 +97,5 @@ export class MockIMUDevice implements IDevice {
 const mockDeviceInstance = MockIMUDevice.getInstance()
 authorizedDevices.value.push(mockDeviceInstance as unknown as Device)
 
+export const init = () => {}
 export const request = () => mockDeviceInstance.request()
-export const connect = () => mockDeviceInstance.connect()
-export const disconnect = () => mockDeviceInstance.disconnect()
-export const getInfo = () => mockDeviceInstance.getInfo()
-export const makeDevice = () => mockDeviceInstance
