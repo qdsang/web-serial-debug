@@ -5,57 +5,67 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build-frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: "20"
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: yarn install
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript type check
+        run: pnpm run build2
 
       - name: Build
-        run: yarn build
+        run: pnpm run build
 
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
           path: dist
+          retention-days: 30
 
   build-desktop:
     needs: build-frontend
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            artifact_name: web-serial-windows
-            asset_name: web-serial-windows.zip
-          - os: macos-latest
-            artifact_name: web-serial-macos
-            asset_name: web-serial-macos.zip
-          - os: ubuntu-22.04
-            artifact_name: web-serial-linux
-            asset_name: web-serial-linux.zip
+        goos: [windows, darwin, linux]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: darwin
+            goarch: amd64
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.goos == 'darwin' && 'macos-latest' || (matrix.goos == 'windows' && 'windows-latest' || 'ubuntu-22.04') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: "1.21"
+          cache-dependency-path: window/go.sum
 
       - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-22.04'
+        if: matrix.goos == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev
@@ -71,25 +81,39 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Build desktop app
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
         run: |
           cd window
-          go build -v -ldflags "-X main.version=${{ steps.version.outputs.VERSION }}" -o ${{ matrix.artifact_name }}
+          OUTPUT_NAME="web-serial-${{ matrix.goos }}-${{ matrix.goarch }}"
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            EXT=".exe"
+          fi
+          go build -v -ldflags "-X main.version=${VERSION} -X main.buildTime=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" -o "${OUTPUT_NAME}${EXT}"
 
       - name: Create release asset
-        if: matrix.os != 'windows-latest'
         run: |
           cd window
-          zip -r ${{ matrix.asset_name }} ${{ matrix.artifact_name }} ./dist
-
-      - name: Create release asset (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd window
-          powershell -Command "Compress-Archive -Path ${{ matrix.artifact_name }},dist -DestinationPath ${{ matrix.asset_name }}"
+          OUTPUT_NAME="web-serial-${{ matrix.goos }}-${{ matrix.goarch }}"
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            EXT=".exe"
+          fi
+          if [ "${{ matrix.goos }}" = "linux" ]; then
+            tar -czf "${OUTPUT_NAME}.tar.gz" "${OUTPUT_NAME}${EXT}" ./dist
+          else
+            zip -r "${OUTPUT_NAME}.zip" "${OUTPUT_NAME}${EXT}" ./dist
+          fi
 
       - name: Upload release asset
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          files: window/${{ matrix.asset_name }}
+          files: window/web-serial-${{ matrix.goos }}-${{ matrix.goarch }}.*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
