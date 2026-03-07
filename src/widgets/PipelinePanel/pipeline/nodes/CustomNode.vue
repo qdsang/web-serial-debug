@@ -42,7 +42,7 @@ import { NodeToolbar } from '@vue-flow/node-toolbar'
 import { Handle } from '@vue-flow/core'
 import { ElButton } from 'element-plus'
 import { computed } from 'vue'
-import { useFieldStore } from '../../../store/fieldStore'
+import { useFieldStore } from '@/store/fieldStore'
 import './style.css'
 
 interface Action {

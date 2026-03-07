@@ -113,7 +113,7 @@ import {
   Switch,
   DataLine
 } from '@element-plus/icons-vue'
-import { useFieldStore } from '../../store/fieldStore'
+import { useFieldStore } from '@/store/fieldStore'
 
 const props = defineProps<{
   modelValue: boolean

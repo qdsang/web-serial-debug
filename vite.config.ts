@@ -5,6 +5,11 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   base: '/web-serial-debug/',
+  resolve: {
+    alias: {
+      '@': '/src',
+    }
+  },
   build: {
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
