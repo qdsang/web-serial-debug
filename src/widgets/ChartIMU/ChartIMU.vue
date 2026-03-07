@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, markRaw } from 'vue'
 
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
@@ -30,54 +30,75 @@ const yaw = ref(0)
 const currentModel = ref('rocket')
 const customModel = ref<THREE.Group | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const showGrid = ref(true)
+const showAxes = ref(true)
+const currentCamera = ref('default')
+
+const modelOptions = [
+  { key: 'arrow', name: '箭头' },
+  { key: 'cube', name: '方块' },
+  { key: 'rocket', name: '火箭' }
+]
 
 const isDark = useDark()
 const sceneBackground = computed(() => isDark.value ? 0x1a1a1a : 0xf0f0f0)
-// const gridColor = computed(() => isDark.value ? 0x404040 : 0x808080)
+const gridColor = computed(() => isDark.value ? 0x404040 : 0x808080)
 const modelColor = computed(() => isDark.value ? 0x404040 : 0x3366ff)
-// const modelColor = computed(() => isDark.value ? 0xF4F5F0 : 0x3366ff)
 
-let scene: THREE.Scene
-let clock: THREE.Clock
-let camera: THREE.PerspectiveCamera
-let renderer: THREE.WebGLRenderer
-let model: THREE.Group
+const scene = ref<THREE.Scene>()
+const clock = ref<THREE.Clock>()
+const camera = ref<THREE.PerspectiveCamera>()
+const renderer = ref<THREE.WebGLRenderer>()
+const model = ref<THREE.Group>()
 let controls: OrbitControls
 let animationFrameId: number
 let stats: Stats
 let rocketFireMesh: any
+let gridHelper: THREE.GridHelper
+let axesHelper: THREE.AxesHelper
+
+const cameraPresets = [
+  { key: 'default', name: '默认视角', position: [2, 2, 2] },
+  { key: 'front', name: '正视图', position: [0, 0, 5] },
+  { key: 'top', name: '俯视图', position: [0, 5, 0.1] },
+  { key: 'side', name: '侧视图', position: [5, 0, 0] },
+  { key: 'iso', name: '等轴测', position: [3, 3, 3] }
+]
 
 const initScene = () => {
-  scene = new THREE.Scene()
-  scene.background = new THREE.Color(sceneBackground.value)
+  scene.value = markRaw(new THREE.Scene())
+  scene.value.background = new THREE.Color(sceneBackground.value)
 
-  // 添加坐标轴辅助器
-  const axesHelper = new THREE.AxesHelper(1.6)
-  scene.add(axesHelper)
+  axesHelper = new THREE.AxesHelper(1.6)
+  scene.value.add(axesHelper)
 
-  clock = new THREE.Clock()
+  gridHelper = new THREE.GridHelper(10, 10, gridColor.value, gridColor.value)
+  scene.value.add(gridHelper)
 
-  // 初始化性能监视器
-  stats = new Stats()
-  stats.showPanel(0) // 0: fps, 1: ms, 2: mb, 3+: custom
-  stats.dom.style.position = 'absolute'
-  stats.dom.style.left = '0px'
-  stats.dom.style.top = '0px'
-  container.value!.appendChild(stats.dom)
+  clock.value = markRaw(new THREE.Clock())
 
-  camera = new THREE.PerspectiveCamera(75, container.value!.clientWidth / container.value!.clientHeight, 0.1, 1000)
-  camera.position.set(2, 2, 2)
-  camera.lookAt(0, 0, 0)
+  if (!props.readonly) {
+    stats = new Stats()
+    stats.showPanel(0)
+    stats.dom.style.position = 'absolute'
+    stats.dom.style.left = '8px'
+    stats.dom.style.bottom = '60px'
+    container.value!.appendChild(stats.dom)
+  }
 
-  renderer = new THREE.WebGLRenderer({ antialias: true })
-  renderer.setSize(container.value!.clientWidth, container.value!.clientHeight)
-  container.value!.appendChild(renderer.domElement)
+  const aspect = container.value!.clientWidth / container.value!.clientHeight
+  camera.value = markRaw(new THREE.PerspectiveCamera(75, aspect, 0.1, 1000))
+  camera.value.position.set(2, 2, 2)
+  camera.value.lookAt(0, 0, 0)
 
-  controls = new OrbitControls(camera, renderer.domElement)
+  renderer.value = markRaw(new THREE.WebGLRenderer({ antialias: true }))
+  renderer.value.setSize(container.value!.clientWidth, container.value!.clientHeight)
+  container.value!.appendChild(renderer.value.domElement)
+
+  controls = new OrbitControls(camera.value, renderer.value.domElement)
   controls.enableDamping = true
-
-//   const gridHelper = new THREE.GridHelper(10, 10, gridColor.value, gridColor.value)
-//   scene.add(gridHelper)
+  controls.enablePan = true
+  controls.enableZoom = true
 
   createModel(currentModel.value)
   addLights()
@@ -86,8 +107,7 @@ const initScene = () => {
 const createArrowModel = () => {
   const group = new THREE.Group()
 
-  // 箭头主体
-  const bodyGeometry = new THREE.ConeGeometry(0.5, 1.4, 12)
+  const bodyGeometry = new THREE.ConeGeometry(0.3, 1.2, 12)
   const bodyMaterial = new THREE.MeshStandardMaterial({
     color: modelColor.value,
     metalness: 0.6,
@@ -95,11 +115,10 @@ const createArrowModel = () => {
     envMapIntensity: 1.2
   })
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
-  body.position.set(0, 0, -0.6)
-  body.rotation.x = -Math.PI / 2
+  body.position.set(0, 0.6, 0)
   group.add(body)
 
-  const tailGeometry = new THREE.BoxGeometry(0.4, 0.4, 1)
+  const tailGeometry = new THREE.CylinderGeometry(0.15, 0.25, 0.8, 12)
   const tailMaterial = new THREE.MeshStandardMaterial({
     color: modelColor.value,
     metalness: 0.6,
@@ -107,7 +126,7 @@ const createArrowModel = () => {
     envMapIntensity: 1.2
   })
   const tail = new THREE.Mesh(tailGeometry, tailMaterial)
-  tail.position.set(0, 0, 0.3)
+  tail.position.set(0, -0.4, 0)
   group.add(tail)
 
   return group
@@ -116,7 +135,6 @@ const createArrowModel = () => {
 const createRocketModel = () => {
   const group = new THREE.Group()
 
-  // 箭头主体
   const bodyGeometry = new THREE.ConeGeometry(0.2, 0.5, 12)
   const bodyMaterial = new THREE.MeshStandardMaterial({
     color: modelColor.value,
@@ -125,8 +143,7 @@ const createRocketModel = () => {
     envMapIntensity: 1.2
   })
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial)
-  body.position.set(0, 1.05, 0)
-  // body.rotation.x = -Math.PI / 2
+  body.position.set(0, 1.55, 0)
   group.add(body)
 
   const tailGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.6)
@@ -137,7 +154,7 @@ const createRocketModel = () => {
     envMapIntensity: 1.2
   })
   const tail = new THREE.Mesh(tailGeometry, tailMaterial)
-  tail.position.set(0, 0, 0)
+  tail.position.set(0, 0.5, 0)
   group.add(tail)
 
   const fireRadius = 0.09;
@@ -147,10 +164,10 @@ const createRocketModel = () => {
 
   const geometry0 = new particleFire.Geometry( fireRadius, fireHeight, particleCount );
   const material0 = new particleFire.Material( { color: 0xff2200 } );
-  material0.setPerspective( camera.fov, height );
+  material0.setPerspective( camera.value!.fov, height );
   rocketFireMesh = new THREE.Points( geometry0, material0 );
   rocketFireMesh.rotation.x = 3.14
-  rocketFireMesh.position.set(0, -0.92, 0)
+  rocketFireMesh.position.set(0, -0.42, 0)
 
   group.add(rocketFireMesh)
 
@@ -168,38 +185,115 @@ const createCubeModel = () => {
     envMapIntensity: 1
   })
   const cube = new THREE.Mesh(geometry, material)
+  cube.position.set(0, 0.5, 0)
   group.add(cube)
 
   return group
 }
 
 const createModel = (type: string) => {
-  if (model) {
-    scene.remove(model)
+  if (model.value && scene.value) {
+    scene.value.remove(model.value)
   }
+
+  let newModel: THREE.Group
 
   switch (type) {
     case 'rocket':
-      model = createRocketModel()
+      newModel = createRocketModel()
       break
     case 'arrow':
-      model = createArrowModel()
+      newModel = createArrowModel()
       break
     case 'cube':
-      model = createCubeModel()
+      newModel = createCubeModel()
       break
     case 'custom':
-      if (customModel) {
-        model = customModel.value!
+      if (customModel.value) {
+        newModel = customModel.value
       } else {
-        model = createArrowModel()
+        newModel = createArrowModel()
       }
       break
     default:
-      model = createArrowModel()
+      newModel = createArrowModel()
   }
 
-  scene.add(model)
+  model.value = markRaw(newModel)
+  scene.value!.add(model.value)
+}
+
+const addLights = () => {
+  const ambientLight = new THREE.AmbientLight(0xffffff, 6)
+  scene.value!.add(ambientLight)
+
+  const mainLight = new THREE.DirectionalLight(0xffffff, 12)
+  mainLight.position.set(5, 5, 10)
+  scene.value!.add(mainLight)
+
+  const fillLight = new THREE.DirectionalLight(0xffffff, 1)
+  fillLight.position.set(-5, 3, -5)
+  scene.value!.add(fillLight)
+
+  const pointLight = new THREE.PointLight(0x4a9eff, 1, 10)
+  pointLight.position.set(2, 2, 2)
+  scene.value!.add(pointLight)
+}
+
+const animate = () => {
+  animationFrameId = requestAnimationFrame(animate)
+  
+  if (stats) stats.begin()
+  
+  if (model.value) {
+    model.value.rotation.set(
+      THREE.MathUtils.degToRad(roll.value),
+      THREE.MathUtils.degToRad(yaw.value),
+      THREE.MathUtils.degToRad(pitch.value)
+    )
+  }
+  if (rocketFireMesh && clock.value) {
+    rocketFireMesh.material.update( clock.value.getDelta() )
+  }
+
+  controls.update()
+  renderer.value!.render(scene.value!, camera.value!)
+  
+  if (stats) stats.end()
+}
+
+const handleResize = () => {
+  if (container.value && camera.value && renderer.value) {
+    const width = container.value.clientWidth
+    const height = container.value.clientHeight
+    camera.value.aspect = width / height
+    camera.value.updateProjectionMatrix()
+    renderer.value.setSize(width, height)
+
+    if (rocketFireMesh) {
+      rocketFireMesh.material.setPerspective( camera.value.fov, height )
+    }
+  }
+}
+
+const handleImuData = (data: any) => {
+  if (!data || typeof data.pitch !== 'number') return
+  
+  const { pitch: p, roll: r, yaw: y } = data
+  pitch.value = p
+  roll.value = r
+  yaw.value = y
+}
+
+const switchModel = () => {
+  const models = ['arrow', 'cube', 'rocket']
+  const currentIndex = models.indexOf(currentModel.value)
+  currentModel.value = models[(currentIndex + 1) % models.length]
+  createModel(currentModel.value)
+}
+
+const uploadModel = () => {
+  fileInput.value?.click()
 }
 
 const handleFileSelect = (event: Event) => {
@@ -216,13 +310,11 @@ const handleFileSelect = (event: Event) => {
     if (extension === 'gltf' || extension === 'glb') {
       const loader = new GLTFLoader()
       loader.parse(contents as string, '', 
-      // @ts-ignore
         (gltf) => {
-          customModel.value = gltf.scene
+          customModel.value = markRaw(gltf.scene)
           currentModel.value = 'custom'
           createModel('custom')
         },
-        // @ts-ignore
         (error) => {
           ElMessage.error('加载模型失败：' + error.message)
         }
@@ -231,7 +323,7 @@ const handleFileSelect = (event: Event) => {
       const loader = new OBJLoader()
       try {
         const object = loader.parse(contents as string)
-        customModel.value = object
+        customModel.value = markRaw(object)
         currentModel.value = 'custom'
         createModel('custom')
       } catch (error) {
@@ -245,91 +337,43 @@ const handleFileSelect = (event: Event) => {
   reader.readAsText(file)
 }
 
-const addLights = () => {
-  // 环境光
-  const ambientLight = new THREE.AmbientLight(0xffffff, 6)
-  scene.add(ambientLight)
-
-  // 主平行光
-  const mainLight = new THREE.DirectionalLight(0xffffff, 12)
-  mainLight.position.set(5, 5, 10)
-  scene.add(mainLight)
-
-  // 补充平行光
-  const fillLight = new THREE.DirectionalLight(0xffffff, 1)
-  fillLight.position.set(-5, 3, -5)
-  scene.add(fillLight)
-
-  // 添加点光源
-  const pointLight = new THREE.PointLight(0x4a9eff, 1, 10)
-  pointLight.position.set(2, 2, 2)
-  scene.add(pointLight)
-}
-
-const animate = () => {
-  var delta = clock.getDelta();
-  animationFrameId = requestAnimationFrame(animate)
-  stats.begin()
-  
-  if (model) {
-    model.rotation.set(
-      THREE.MathUtils.degToRad(roll.value),
-      THREE.MathUtils.degToRad(yaw.value),
-      THREE.MathUtils.degToRad(pitch.value)
-    )
-  }
-  if (rocketFireMesh) {
-    rocketFireMesh.material.update( delta );
-  }
-
-  controls.update()
-  renderer.render(scene, camera)
-  stats.end()
-}
-
-const handleResize = () => {
-  if (container.value && camera && renderer) {
-    let width = container.value.clientWidth
-    let height = container.value.clientHeight
-    camera.aspect = width / height
-    camera.updateProjectionMatrix()
-    renderer.setSize(width, height)
-
-    if (rocketFireMesh) {
-      rocketFireMesh.material.setPerspective( camera.fov, height );
-    }
+const setCameraPreset = (presetKey: string) => {
+  const preset = cameraPresets.find(p => p.key === presetKey)
+  if (preset && camera.value) {
+    camera.value.position.set(...preset.position as [number, number, number])
+    camera.value.lookAt(0, 0, 0)
+    currentCamera.value = presetKey
+    controls.update()
   }
 }
 
-const handleImuData = (data: any) => {
-  if (!data || typeof data.pitch !== 'number') return
-  
-  const { pitch: p, roll: r, yaw: y } = data
-  pitch.value = p
-  roll.value = r
-  yaw.value = y
-}
-
-const switchModel = () => {
-  if (currentModel.value === 'arrow') {
-    currentModel.value = 'cube'
-  } else if (currentModel.value === 'cube') {
-    currentModel.value = 'rocket'
-  } else if (currentModel.value === 'rocket') {
-    currentModel.value = 'arrow'
-  } else {
-    currentModel.value = 'arrow'
+const toggleGrid = () => {
+  showGrid.value = !showGrid.value
+  if (gridHelper) {
+    gridHelper.visible = showGrid.value
   }
-  createModel(currentModel.value)
 }
 
-const uploadModel = () => {
-  fileInput.value?.click()
+const toggleAxes = () => {
+  showAxes.value = !showAxes.value
+  if (axesHelper) {
+    axesHelper.visible = showAxes.value
+  }
+}
+
+const resetView = () => {
+  setCameraPreset('default')
+  pitch.value = 0
+  roll.value = 0
+  yaw.value = 0
 }
 
 const getConfig = () => {
   return {
-    modelType: currentModel.value
+    modelType: currentModel.value,
+    showGrid: showGrid.value,
+    showAxes: showAxes.value,
+    cameraPreset: currentCamera.value
   }
 }
 
@@ -337,6 +381,17 @@ const setConfig = (config: Record<string, any>) => {
   if (config.modelType) {
     currentModel.value = config.modelType
     createModel(currentModel.value)
+  }
+  if (config.showGrid !== undefined) {
+    showGrid.value = config.showGrid
+    if (gridHelper) gridHelper.visible = showGrid.value
+  }
+  if (config.showAxes !== undefined) {
+    showAxes.value = config.showAxes
+    if (axesHelper) axesHelper.visible = showAxes.value
+  }
+  if (config.cameraPreset) {
+    setCameraPreset(config.cameraPreset)
   }
 }
 
@@ -360,24 +415,62 @@ onUnmounted(() => {
   
   eventCenter.off(EventNames.DATA_UPDATE, handleImuData)
   window.removeEventListener('resize', handleResize)
-  renderer.dispose()
+  
+  if (renderer.value) {
+    renderer.value.dispose()
+  }
 })
 </script>
 
 <template>
   <div class="chart-3d-container">
     <div ref="container" class="canvas-container"></div>
+    
     <div class="data-panel">
-      <div>Pitch: {{ pitch.toFixed(2) }}°</div>
-      <div>Roll: {{ roll.toFixed(2) }}°</div>
-      <div>Yaw: {{ yaw.toFixed(2) }}°</div>
-      <div class="model-controls" v-if="!readonly">
-        <el-button class="model-switch" @click="switchModel" size="small">
-          切换模型
+      <div class="data-row">
+        <span class="label">Pitch</span>
+        <span class="value">{{ pitch.toFixed(1) }}°</span>
+      </div>
+      <div class="data-row">
+        <span class="label">Roll</span>
+        <span class="value">{{ roll.toFixed(1) }}°</span>
+      </div>
+      <div class="data-row">
+        <span class="label">Yaw</span>
+        <span class="value">{{ yaw.toFixed(1) }}°</span>
+      </div>
+    </div>
+
+    <div class="model-panel" v-if="!readonly">
+      <el-button
+        v-for="model in modelOptions"
+        :key="model.key"
+        :type="currentModel === model.key ? 'primary' : 'default'"
+        size="small"
+        @click="currentModel = model.key; createModel(currentModel)"
+      >
+        {{ model.name }}
+      </el-button>
+      <el-button @click="uploadModel" size="small">导入</el-button>
+    </div>
+
+    <div class="control-panel" v-if="!readonly">
+      <div class="control-section">
+        <el-button
+          v-for="preset in cameraPresets"
+          :key="preset.key"
+          :type="currentCamera === preset.key ? 'primary' : 'default'"
+          size="small"
+          @click="setCameraPreset(preset.key)"
+        >
+          {{ preset.name }}
         </el-button>
-        <el-button class="model-upload" @click="uploadModel" size="small">
-          导入模型
-        </el-button>
+      </div>
+
+      <div class="control-section">
+        <el-button @click="resetView" size="small">重置</el-button>
+        <el-button @click="toggleGrid" size="small" :type="showGrid ? 'default' : 'info'">网格</el-button>
+        <el-button @click="toggleAxes" size="small" :type="showAxes ? 'default' : 'info'">轴</el-button>
         <input
           ref="fileInput"
           type="file"
@@ -390,11 +483,12 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="less">
 .chart-3d-container {
   position: relative;
   width: 100%;
   height: 100%;
+  background: var(--el-bg-color);
 }
 
 .canvas-container {
@@ -404,30 +498,72 @@ onUnmounted(() => {
 
 .data-panel {
   position: absolute;
-  top: 20px;
-  right: 20px;
-  background: linear-gradient(135deg, rgba(60, 60, 60, 0.8), rgba(30, 30, 30, 0.8));
-  color: #ffffff;
-  padding: 15px;
-  border-radius: 8px;
+  top: 8px;
+  right: 8px;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
   font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+  font-size: 12px;
   backdrop-filter: blur(10px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.1);
+
+  .data-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    
+    .label {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 11px;
+    }
+    
+    .value {
+      font-weight: 600;
+      color: #4fc3f7;
+      min-width: 45px;
+      text-align: right;
+    }
+  }
 }
 
-.data-panel div {
-  margin: 5px 0;
+.model-panel {
+  position: absolute;
+  top: 100px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  flex-direction: column;
 }
 
-.model-controls {
-  margin-top: 10px;
+.control-panel {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.model-switch,
-.model-upload {
-  flex: 1;
+.control-section {
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 6px;
+  padding: 6px 10px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+:deep(.dark) {
+  .data-panel,
+  .control-section {
+    background: rgba(30, 30, 30, 0.9);
+  }
 }
 </style>
