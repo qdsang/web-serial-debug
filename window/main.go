@@ -5,14 +5,24 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 
-	"github.com/influxdata/influxdb-client-go/v2"
-	"github.com/webview/webview_go"
 	"window/bridge"
+
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	webview "github.com/webview/webview_go"
 )
+
+func findAvailablePort() (net.Listener, error) {
+	l, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		return nil, err
+	}
+	return l, nil
+}
 
 // 这些变量会在编译时通过 -ldflags 注入
 // go build -ldflags "-X main.buildTime=$(date) -X main.version=1.0.0"
@@ -66,7 +76,7 @@ func main() {
 	defer w.Destroy()
 
 	// 设置窗口标题和大小
-	w.SetTitle("Serial Debug Tool")
+	w.SetTitle("BUS Tool")
 	w.SetSize(1024, 768, webview.HintNone)
 
 	// 创建bridge实例，传入数据库配置
@@ -80,6 +90,7 @@ func main() {
 	w.Bind("initSerial", b.InitSerial)
 	w.Bind("writeSerial", b.WriteSerial)
 	w.Bind("readSerial", b.ReadSerial)
+	w.Bind("getSerialPorts", b.GetSerialPorts)
 
 	// 注册文件操作相关的JavaScript桥接函数
 	w.Bind("saveFile", b.SaveFile)
@@ -103,10 +114,31 @@ func main() {
 			log.Fatal(err)
 		}
 		resourceDir := filepath.Dir(exePath)
-		if runtime.GOOS == "darwin" {
-			resourceDir = filepath.Join(resourceDir, "../Resources")
+		distDir := filepath.Join(resourceDir, "dist")
+
+		ln, err := findAvailablePort()
+		if err != nil {
+			log.Fatal(err)
 		}
-		resourcePath = fmt.Sprintf("file://%s/dist/index.html", resourceDir)
+
+		basePath := "/web-serial-debug"
+		go func() {
+			mux := http.NewServeMux()
+			mux.Handle(basePath+"/", http.StripPrefix(basePath, http.FileServer(http.Dir(distDir))))
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/" || r.URL.Path == basePath {
+					http.ServeFile(w, r, filepath.Join(distDir, "index.html"))
+				} else {
+					http.ServeFile(w, r, filepath.Join(distDir, r.URL.Path))
+				}
+			})
+			if err := http.Serve(ln, mux); err != nil {
+				log.Printf("HTTP server error: %v", err)
+			}
+		}()
+
+		resourcePath = fmt.Sprintf("http://localhost:%d%s", ln.Addr().(*net.TCPAddr).Port, basePath)
+		log.Printf("Serving frontend at %s", resourcePath)
 	}
 
 	// 加载前端页面

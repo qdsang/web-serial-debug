@@ -49,6 +49,11 @@ func (b *Bridge) ReadSerial(callback string) {
 	b.serialManager.ReadSerial(callback)
 }
 
+// 获取可用串口列表
+func (b *Bridge) GetSerialPorts() []string {
+	return b.serialManager.GetPorts()
+}
+
 // 保存数据点
 func (b *Bridge) SaveDataPoint(measurement string, tags map[string]string, fields map[string]interface{}) error {
 	return b.storageManager.SaveDataPoint(measurement, tags, fields)

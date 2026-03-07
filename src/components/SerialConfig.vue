@@ -4,12 +4,14 @@ import { ElMessage } from 'element-plus'
 import { ConfigManager } from '../utils/ConfigManager'
 import { ScriptManager } from '../utils/ScriptManager'
 import { EventCenter, EventNames } from '../utils/EventCenter'
+import { isDesktop } from '../utils/Platform'
 
 import { authorizedDevices, type Device, type IDevice } from '../devices'
 import * as DeviceSerialPort from '../devices/serialport'
 import * as DeviceMockIMU from '../devices/mock-imu'
 import * as DeviceWebUSB from '../devices/webusb'
 import * as DeviceBluetooth from '../devices/bluetooth'
+import { DesktopSerialDevice } from '../devices/desktop'
 
 const configManager = ConfigManager.getInstance()
 const serialConfig = configManager.useConfig('serial')
@@ -55,6 +57,23 @@ const DataEmit = async (data: Uint8Array) => {
 
 
 const handleDeviceAuthorize = async () => {
+  if (isDesktop()) {
+    const ports = await DesktopSerialDevice.getAvailablePorts()
+    if (ports.length === 0) {
+      ElMessage.error('未找到可用的串口')
+      return
+    }
+    const selectedPort = selectedDeviceId.value || ports[0]
+    const desktopDevice = new DesktopSerialDevice(selectedPort, serialConfig.value.baudRate)
+    const existingIndex = authorizedDevices.value.findIndex(d => d.id === desktopDevice.id)
+    if (existingIndex >= 0) {
+      authorizedDevices.value.splice(existingIndex, 1)
+    }
+    authorizedDevices.value.push(desktopDevice as unknown as Device)
+    connectDevice(desktopDevice as unknown as Device)
+    return
+  }
+
   let device: Device | null = null
   switch (selectedDeviceId.value) {
     case 'authorizedSerial':
@@ -205,13 +224,25 @@ onUnmounted(() => {
   eventCenter.off(EventNames.SERIAL_SEND, handleSerialSend)
 })
 
-const handleConenctClick = () => {
+const handleConenctClick = async () => {
   if (isConnected.value) {
-    disconnectSerial()
+    await disconnectSerial()
   } else {
-    const device = authorizedDevices.value.find(d => d.id === selectedDeviceId.value)
-    if (device) {
-      connectDevice(device)
+    if (isDesktop()) {
+      const ports = await DesktopSerialDevice.getAvailablePorts()
+      if (ports.length > 0) {
+        const selectedPort = selectedDeviceId.value || ports[0]
+        const desktopDevice = new DesktopSerialDevice(selectedPort, serialConfig.value.baudRate)
+        authorizedDevices.value.push(desktopDevice as unknown as Device)
+        await connectDevice(desktopDevice as unknown as Device)
+      } else {
+        ElMessage.error('未找到可用的串口')
+      }
+    } else {
+      const device = authorizedDevices.value.find(d => d.id === selectedDeviceId.value)
+      if (device) {
+        connectDevice(device)
+      }
     }
   }
 }
@@ -227,33 +258,46 @@ const handleConenctClick = () => {
         <div class="port-list">
           <el-select v-model="selectedDeviceId" @change="handleDeviceAuthorize" placeholder="选择设备" size="small">
             <el-option label="选择设备" value=""></el-option>
-            <el-option-group label="串口设备">
-              <el-option label="授权串口设备" value="authorizedSerial"></el-option>
-              <el-option
-                v-for="device in authorizedDevices.filter(device => device.type == 'serialport')"
-                :key="device.id"
-                :label="device.title"
-                :value="device.id"
-              />
-            </el-option-group>
-            <el-option-group label="WebUSB设备">
-              <el-option label="授权WebUSB设备" value="authorizedUSB"></el-option>
-              <el-option
-                v-for="device in authorizedDevices.filter(device => device.type == 'usb')"
-                :key="device.id"
-                :label="device.title"
-                :value="device.id"
-              />
-            </el-option-group>
-            <el-option-group label="蓝牙设备">
-              <el-option label="授权蓝牙设备" value="authorizedBluetooth"></el-option>
-              <el-option
-                v-for="device in authorizedDevices.filter(device => device.type == 'bluetooth')"
-                :key="device.id"
-                :label="device.title"
-                :value="device.id"
-              />
-            </el-option-group>
+            <template v-if="isDesktop()">
+              <el-option-group label="桌面串口设备">
+                <el-option label="自动选择串口" value="auto"></el-option>
+                <el-option
+                  v-for="device in authorizedDevices.filter(device => device.type == 'desktop-serial')"
+                  :key="device.id"
+                  :label="device.title"
+                  :value="device.id"
+                />
+              </el-option-group>
+            </template>
+            <template v-else>
+              <el-option-group label="串口设备">
+                <el-option label="授权串口设备" value="authorizedSerial"></el-option>
+                <el-option
+                  v-for="device in authorizedDevices.filter(device => device.type == 'serialport')"
+                  :key="device.id"
+                  :label="device.title"
+                  :value="device.id"
+                />
+              </el-option-group>
+              <el-option-group label="WebUSB设备">
+                <el-option label="授权WebUSB设备" value="authorizedUSB"></el-option>
+                <el-option
+                  v-for="device in authorizedDevices.filter(device => device.type == 'usb')"
+                  :key="device.id"
+                  :label="device.title"
+                  :value="device.id"
+                />
+              </el-option-group>
+              <el-option-group label="蓝牙设备">
+                <el-option label="授权蓝牙设备" value="authorizedBluetooth"></el-option>
+                <el-option
+                  v-for="device in authorizedDevices.filter(device => device.type == 'bluetooth')"
+                  :key="device.id"
+                  :label="device.title"
+                  :value="device.id"
+                />
+              </el-option-group>
+            </template>
             <el-option-group label="其他">
               <el-option label="WebSocket" value="websocket"></el-option>
               <el-option label="脚本" value="script"></el-option>

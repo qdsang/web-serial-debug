@@ -35,14 +35,14 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact_name: web-serial-debug-windows
-            asset_name: web-serial-debug-windows.zip
+            artifact_name: web-serial-windows
+            asset_name: web-serial-windows.zip
           - os: macos-latest
-            artifact_name: web-serial-debug-macos
-            asset_name: web-serial-debug-macos.zip
+            artifact_name: web-serial-macos
+            asset_name: web-serial-macos.zip
           - os: ubuntu-latest
-            artifact_name: web-serial-debug-linux
-            asset_name: web-serial-debug-linux.zip
+            artifact_name: web-serial-linux
+            asset_name: web-serial-linux.zip
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -58,21 +58,23 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: go/dist
+          path: window/dist
 
       - name: Build desktop app
         run: |
-          cd go
-          go build -v -o ${{ matrix.artifact_name }}
+          cd window
+          VERSION=${GITHUB_REF#refs/tags/}
+          BUILD_TIME=$(date -u '+%Y-%m-%d %H:%M:%S')
+          go build -v -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" -o ${{ matrix.artifact_name }}
 
       - name: Create release asset
         run: |
-          cd go
-          zip -r ${{ matrix.asset_name }} ${{ matrix.artifact_name }} dist
+          cd window
+          zip -r ${{ matrix.asset_name }} ${{ matrix.artifact_name }} ./dist
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v1
         with:
-          files: go/${{ matrix.asset_name }}
+          files: window/${{ matrix.asset_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

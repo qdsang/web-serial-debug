@@ -3,6 +3,9 @@ package bridge
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/tarm/serial"
@@ -17,6 +20,41 @@ type SerialManager struct {
 
 func NewSerialManager(view webview.WebView) *SerialManager {
 	return &SerialManager{view: view}
+}
+
+func (s *SerialManager) GetPorts() []string {
+	var ports []string
+
+	switch runtime.GOOS {
+	case "windows":
+		for i := 1; i <= 256; i++ {
+			ports = append(ports, fmt.Sprintf("COM%d", i))
+		}
+	case "darwin":
+		filepath.Walk("/dev", func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			name := filepath.Base(path)
+			if len(name) > 3 && (name[:4] == "tty." || name[:3] == "cu.") {
+				ports = append(ports, path)
+			}
+			return nil
+		})
+	case "linux":
+		filepath.Walk("/dev", func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			name := filepath.Base(path)
+			if len(name) > 3 && (name[:4] == "ttyS" || name[:4] == "ttyUSB" || name[:4] == "ttyACM" || name[:7] == "ttyAMA") {
+				ports = append(ports, path)
+			}
+			return nil
+		})
+	}
+
+	return ports
 }
 
 // 初始化串口
