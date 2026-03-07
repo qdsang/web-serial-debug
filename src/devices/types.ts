@@ -28,3 +28,31 @@ export interface Device extends IDevice {
 }
 
 export const authorizedDevices = ref<Device[]>([])
+
+export interface SerialConfig {
+  baudRate: number
+  dataBits: number
+  stopBits: number
+  parity: string
+  flowControl: string
+}
+
+export interface WebSocketConfig {
+  url: string
+  reconnect: boolean
+  reconnectInterval: number
+}
+
+export const defaultSerialConfig: SerialConfig = {
+  baudRate: 115200,
+  dataBits: 8,
+  stopBits: 1,
+  parity: 'none',
+  flowControl: 'none'
+}
+
+export const defaultWebSocketConfig: WebSocketConfig = {
+  url: 'ws://localhost:8080',
+  reconnect: false,
+  reconnectInterval: 3000
+}

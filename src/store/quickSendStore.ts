@@ -2,12 +2,12 @@ import { defineStore } from 'pinia'
 import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { SerialHelper } from '../utils/SerialHelper'
-
 import { EventCenter, EventNames } from '../utils/EventCenter'
+import { ProfileManagerInst } from '../utils/ProfileManager'
 
 const eventCenter = EventCenter.getInstance()
 
-interface QuickSendItem {
+export interface QuickSendItem {
   id: number
   name: string
   content: string
@@ -15,28 +15,88 @@ interface QuickSendItem {
   addCRLFType: string
 }
 
-interface QuickSendGroup {
+export interface QuickSendGroup {
   id: number
   name: string
   items: QuickSendItem[]
 }
 
+const defaultGroups: QuickSendGroup[] = [
+  {
+    id: 1,
+    name: '默认分组',
+    items: [
+      {
+        id: 1,
+        name: '查询版本',
+        content: 'AT+VERSION?',
+        type: 'text',
+        addCRLFType: '\n'
+      },
+      {
+        id: 2,
+        name: '重启设备',
+        content: 'AT+RESET',
+        type: 'text',
+        addCRLFType: '\n'
+      },
+      {
+        id: 3,
+        name: '查询状态',
+        content: 'AT+STATUS?',
+        type: 'text',
+        addCRLFType: '\n'
+      },
+      {
+        id: 4,
+        name: '16进制测试',
+        content: 'AA BB CC 11 22',
+        type: 'hex',
+        addCRLFType: ''
+      }
+    ]
+  }
+]
 
 export const useQuickSendStore = defineStore('quickSend', () => {
   const serialHelper = SerialHelper.getInstance()
+  const profileManager = ProfileManagerInst
+
   const groups = ref<QuickSendGroup[]>([])
   const currentGroupId = ref<number>(0)
   const currentGroup = computed(() => groups.value.find(g => g.id === currentGroupId.value) || groups.value[0])
   const autoSendIntervals = ref<Record<number, number>>({})
   const autoSendInterval = ref(1000)
 
-  // 验证HEX格式数据
+  const loadFromProfile = () => {
+    const profile = profileManager.activeProfile
+    const savedGroups = profile?.config?.quickSendGroups as QuickSendGroup[] | undefined
+    
+    if (savedGroups && savedGroups.length > 0) {
+      groups.value = savedGroups
+    } else {
+      groups.value = JSON.parse(JSON.stringify(defaultGroups))
+    }
+    setCurrentGroup(groups.value[0])
+  }
+
+  const saveToProfile = () => {
+    const profile = profileManager.activeProfile
+    if (profile) {
+      profileManager.updateProfile(profile.id, {
+        config: {
+          ...profile.config,
+          quickSendGroups: groups.value
+        }
+      })
+    }
+  }
+
   const validateHexData = (data: string): boolean => {
     const hexPattern = /^[0-9A-Fa-f\s]*$/
     return hexPattern.test(data)
   }
 
-  // 发送数据
   const sendData = (item: QuickSendItem) => {
     if (!item.content) {
       ElMessage.warning('发送内容不能为空')
@@ -52,7 +112,6 @@ export const useQuickSendStore = defineStore('quickSend', () => {
     eventCenter.emit(EventNames.SERIAL_SEND, data)
   }
 
-  // 切换自动发送
   const toggleAutoSend = (item: QuickSendItem) => {
     const intervalId = autoSendIntervals.value[item.id]
     if (intervalId) {
@@ -63,18 +122,16 @@ export const useQuickSendStore = defineStore('quickSend', () => {
     }
   }
 
-  // 添加项目
   const addItem = () => {
     currentGroup.value.items.push({
       id: Date.now(),
       name: '新建项目',
       content: '',
       type: 'text',
-      addCRLFType: '\\n'
+      addCRLFType: '\n'
     })
   }
 
-  // 删除项目
   const removeItem = (id: number) => {
     const index = currentGroup.value.items.findIndex(item => item.id === id)
     if (index > -1) {
@@ -82,7 +139,6 @@ export const useQuickSendStore = defineStore('quickSend', () => {
     }
   }
 
-  // 添加分组
   const addGroup = (name: string) => {
     if (name) {
       groups.value.push({
@@ -93,7 +149,6 @@ export const useQuickSendStore = defineStore('quickSend', () => {
     }
   }
 
-  // 删除分组
   const removeGroup = () => {
     if (groups.value.length <= 1) {
       ElMessage.warning('至少保留一个分组')
@@ -109,7 +164,6 @@ export const useQuickSendStore = defineStore('quickSend', () => {
     }
   }
 
-  // 重命名分组
   const renameGroup = (name: string) => {
     if (name) {
       currentGroup.value.name = name
@@ -120,13 +174,11 @@ export const useQuickSendStore = defineStore('quickSend', () => {
     currentGroupId.value = group.id
   }
 
-  // 切换分组
   const handleGroupChange = (groupId: number) => {
     console.log('切换分组', groupId, groups)
     currentGroupId.value = groupId
   }
 
-  // 导入配置
   const importConfig = (data: any) => {
     try {
       if (!Array.isArray(data) || !data.every(group =>
@@ -139,79 +191,22 @@ export const useQuickSendStore = defineStore('quickSend', () => {
       }
       groups.value = data
       setCurrentGroup(groups.value[0])
+      saveToProfile()
       ElMessage.success('导入成功')
     } catch (error) {
       ElMessage.error(`导入失败：${error instanceof Error ? error.message : '无效的配置文件'}`)
     }
   }
 
-  // 导出配置
   const exportConfig = () => {
     return JSON.stringify(groups.value, null, 2)
   }
 
-  // 保存到本地存储
-  const saveToLocalStorage = () => {
-    localStorage.setItem('config.quickSendGroups', JSON.stringify(groups.value))
-  }
-
-  // 从本地存储加载
-  const loadFromLocalStorage = () => {
-    const savedGroups = localStorage.getItem('config.quickSendGroups')
-    if (savedGroups) {
-      try {
-        groups.value = JSON.parse(savedGroups)
-      } catch (error) {
-        ElMessage.error('加载配置失败')
-      }
-    }
-    if (groups.value.length == 0) {
-      groups.value = [
-      {
-        id: 1,
-        name: '默认分组',
-        items: [
-          {
-              id: 1,
-              name: '查询版本',
-              content: 'AT+VERSION?',
-              type: 'text',
-              addCRLFType: '\n'
-          },
-          {
-              id: 2,
-              name: '重启设备',
-              content: 'AT+RESET',
-              type: 'text',
-              addCRLFType: '\n'
-          },
-          {
-              id: 3,
-              name: '查询状态',
-              content: 'AT+STATUS?',
-              type: 'text',
-              addCRLFType: '\n'
-          },
-          {
-              id: 4,
-              name: '16进制测试',
-              content: 'AA BB CC 11 22',
-              type: 'hex',
-              addCRLFType: ''
-          }
-        ]
-      }]
-    }
-    setCurrentGroup(groups.value[0])
-  }
-
-  // 监听数据变化，自动保存
   watch([groups, currentGroup], () => {
-    saveToLocalStorage()
+    saveToProfile()
   }, { deep: true })
 
-  // 初始化时加载数据
-  loadFromLocalStorage()
+  loadFromProfile()
 
   return {
     groups,
@@ -228,6 +223,7 @@ export const useQuickSendStore = defineStore('quickSend', () => {
     renameGroup,
     handleGroupChange,
     importConfig,
-    exportConfig
+    exportConfig,
+    loadFromProfile
   }
 })

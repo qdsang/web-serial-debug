@@ -1,7 +1,7 @@
-const WebSocket = require('ws');
+import WebSocket, { WebSocketServer } from 'ws';
 
 // 创建WebSocket服务器，监听8080端口
-const wss = new WebSocket.Server({ port: 8080 });
+const wss = new WebSocketServer({ port: 8080 });
 
 // 存储所有连接的客户端
 const clients = new Set();

@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { authorizedDevices, type Device, type IDevice, type DeviceInfo } from '../types'
 import { ConfigManager } from '../../utils/ConfigManager'
+import { ProfileManagerInst } from '../../utils/ProfileManager'
 
 const configManager = ConfigManager.getInstance()
 const wsConfig = configManager.useConfig('websocket')
@@ -48,29 +49,23 @@ export class WebSocketDevice implements IDevice {
   }
 
   static async init(): Promise<void> {
-    const savedUrls = localStorage.getItem('websocket.connected')
-    if (savedUrls) {
+    const profile = ProfileManagerInst.activeProfile
+    const savedUrls = profile?.config?.websocket?.url ? [profile.config.websocket.url] : []
+    for (const url of savedUrls) {
       try {
-        const urls = JSON.parse(savedUrls) as string[]
-        for (const url of urls) {
-          try {
-            const ws = new WebSocket(url)
-            await new Promise<void>((resolve, reject) => {
-              ws.onopen = () => resolve()
-              ws.onerror = () => reject(new Error('Connection failed'))
-              setTimeout(() => reject(new Error('Connection timeout')), 5000)
-            })
-            const device = new WebSocketDevice(ws, url)
-            const existing = authorizedDevices.value.find(d => d.id === device.id)
-            if (!existing) {
-              authorizedDevices.value.push(device as unknown as Device)
-            }
-          } catch (error) {
-            console.warn(`Failed to restore WebSocket connection: ${url}`, error)
-          }
+        const ws = new WebSocket(url)
+        await new Promise<void>((resolve, reject) => {
+          ws.onopen = () => resolve()
+          ws.onerror = () => reject(new Error('Connection failed'))
+          setTimeout(() => reject(new Error('Connection timeout')), 5000)
+        })
+        const device = new WebSocketDevice(ws, url)
+        const existing = authorizedDevices.value.find(d => d.id === device.id)
+        if (!existing) {
+          authorizedDevices.value.push(device as unknown as Device)
         }
       } catch (error) {
-        console.error('Failed to parse saved WebSocket connections:', error)
+        console.warn(`Failed to restore WebSocket connection: ${url}`, error)
       }
     }
   }
@@ -88,19 +83,13 @@ export class WebSocketDevice implements IDevice {
       }
 
       const ws = new WebSocket(wsUrl)
-
-      await new Promise<void>((resolve, reject) => {
-        ws.onopen = () => resolve()
-        ws.onerror = () => reject(new Error('Connection failed'))
-        setTimeout(() => reject(new Error('Connection timeout')), 10000)
-      })
-
       const device = new WebSocketDevice(ws, wsUrl)
+      
+      ws.close()
+      
       return device as unknown as Device
     } catch (error: any) {
-      if (error.message !== 'Connection timeout' && error.message !== 'Connection failed') {
-        ElMessage.error('WebSocket 连接失败：' + error.message)
-      }
+      ElMessage.error('WebSocket 设备创建失败：' + error.message)
       console.error(error)
       return null
     }
@@ -204,16 +193,16 @@ export class WebSocketDevice implements IDevice {
   }
 
   private saveConnectedUrl(url: string) {
-    const savedUrls = localStorage.getItem('websocket.connected')
-    let urls: string[] = []
-    if (savedUrls) {
-      try {
-        urls = JSON.parse(savedUrls)
-      } catch {}
-    }
-    if (!urls.includes(url)) {
-      urls.push(url)
-      localStorage.setItem('websocket.connected', JSON.stringify(urls))
+    if (ProfileManagerInst.activeProfile) {
+      ProfileManagerInst.updateProfile(ProfileManagerInst.activeProfile.id, {
+        config: {
+          ...ProfileManagerInst.activeProfile.config,
+          websocket: {
+            ...ProfileManagerInst.activeProfile.config.websocket,
+            url
+          }
+        }
+      })
     }
   }
 }

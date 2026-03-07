@@ -1,6 +1,7 @@
 import { SerialHelper } from './SerialHelper'
 import { useFieldStore } from '../store/fieldStore'
 import { EventCenter, EventNames } from '../utils/EventCenter'
+import { ProfileManagerInst } from './ProfileManager'
 
 const eventCenter = EventCenter.getInstance()
 
@@ -76,6 +77,7 @@ export class ScriptManager {
     isRunning: false
   }
   private serialHelper = SerialHelper.getInstance()
+  private profileManager = ProfileManagerInst
 
   private runtimer: Runtimer = {
     DataReceiverInterface: null,
@@ -218,25 +220,35 @@ return (async function() {
   }
 
   public saveScripts(): void {
-    localStorage.setItem('config.serialScripts', JSON.stringify(this.scripts))
+    const profile = this.profileManager.activeProfile
+    if (profile) {
+      this.profileManager.updateProfile(profile.id, {
+        config: {
+          ...profile.config,
+          scripts: this.scripts
+        }
+      })
+    }
   }
 
   private loadScripts(): void {
-    const savedScripts = localStorage.getItem('config.serialScripts')
-    if (savedScripts) {
-      try {
-        this.scripts = JSON.parse(savedScripts)
-      } catch (error) {
-        console.error('加载脚本失败:', error)
-      }
-    }
-    if (this.scripts.length === 0) {
+    const profile = this.profileManager.activeProfile
+    const savedScripts = profile?.config?.scripts as ScriptItem[] | undefined
+    
+    if (savedScripts && savedScripts.length > 0) {
+      this.scripts = savedScripts
+    } else {
       this.addScript('数据处理Demo（key:val,key:val）', demo1)
     }
+    
     this.scripts.map((script) => {
       script.isRunning = false
     })
 
     this.currentScript = this.scripts[0] || this.currentScript
+  }
+
+  public reloadFromProfile(): void {
+    this.loadScripts()
   }
 }

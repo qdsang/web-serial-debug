@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ConfigManager } from '../utils/ConfigManager'
 import { ScriptManager } from '../utils/ScriptManager'
 import { EventCenter, EventNames } from '../utils/EventCenter'
 import { isDesktop } from '../utils/Platform'
+import { ProfileManagerInst } from '../utils/ProfileManager'
 
 import { authorizedDevices, type Device, type IDevice } from '../devices'
 import * as DeviceSerialPort from '../devices/serialport'
@@ -15,7 +16,12 @@ import * as DeviceWebSocket from '../devices/websocket'
 import { DesktopSerialDevice } from '../devices/desktop'
 
 const configManager = ConfigManager.getInstance()
-const serialConfig = configManager.useConfig('serial')
+configManager.init()
+
+const profileManager = ProfileManagerInst
+const activeProfile = profileManager.activeProfileRef
+const serialConfig = computed(() => activeProfile.value?.config?.serial || configManager.getConfig('serial'))
+const wsConfig = computed(() => activeProfile.value?.config?.websocket || configManager.getConfig('websocket'))
 
 const scriptManager = ScriptManager.getInstance()
 
@@ -132,7 +138,7 @@ const connectDevice = async (device: Device) => {
     startReading()
     selectedDeviceId.value = device.id
   } else {
-    selectedDeviceId.value = ''
+    // selectedDeviceId.value = ''
   }
 }
 
@@ -203,17 +209,23 @@ const handleSerialSend = async (data: Uint8Array) => {
   }
 }
 
-const wsConfig = ref({
-  url: '',
-  history: [] as string[]
-})
+const wsUrlHistory = ref<string[]>([])
 
 const handleWsConfigChange = (value: string) => {
   if (!value) return
-  wsConfig.value.url = value
-  if (!wsConfig.value.history.includes(value)) {
-    wsConfig.value.history.push(value)
-    localStorage.setItem('config.wsConfig', JSON.stringify(wsConfig.value))
+  if (!wsUrlHistory.value.includes(value)) {
+    wsUrlHistory.value.push(value)
+    if (activeProfile.value) {
+      profileManager.updateProfile(activeProfile.value.id, {
+        config: {
+          ...activeProfile.value.config,
+          websocket: {
+            ...activeProfile.value.config.websocket,
+            url: value
+          }
+        }
+      })
+    }
   }
 }
 
@@ -321,7 +333,7 @@ const handleConenctClick = async () => {
       <el-form v-if="selectedDeviceId == 'websocket'" :model="wsConfig" :inline="true" size="small" class="config-section">
         <el-form-item label="ws">
           <el-select v-model="wsConfig.url" filterable allow-create @change="handleWsConfigChange" style="width: 300px;">
-            <el-option v-for="url in wsConfig.history" :key="url" :label="url" :value="url" />
+            <el-option v-for="url in wsUrlHistory" :key="url" :label="url" :value="url" />
           </el-select>
         </el-form-item>
       </el-form>

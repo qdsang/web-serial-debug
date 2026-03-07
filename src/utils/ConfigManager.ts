@@ -1,128 +1,26 @@
 import { ref, watch } from 'vue'
+import { getStorage, type StorageAdapter } from './StorageAdapter'
+import { defaultSerialConfig, defaultWebSocketConfig } from '../devices/types'
+import { defaultDisplayConfig, defaultSendConfig, defaultLayoutConfig } from '../components/types'
 
-interface SerialConfig {
-  baudRate: number
-  dataBits: number
-  stopBits: number
-  parity: string
-  flowControl: string
-}
+type ConfigKey = string
 
-interface DisplayConfig {
-  showTime: boolean
-  showMs: boolean
-  showHex: boolean
-  showText: boolean
-  showNewline: boolean
-  autoScroll: boolean
-  timeOut: number
-}
-
-interface SendConfig {
-  isHexSend: boolean
-  addCRLF: boolean
-  addCRLFType: string
-  autoSend: boolean
-  autoSendInterval: number
-  addChecksum: boolean
-  content: string
-  history: string[]
-  historyMaxLength: number
-}
-
-interface LayoutConfig {
-  splitPaneSize: number
-  leftActiveTab: string
-  rightActiveTab: string
-}
-
-interface ChartConfig {
-  id: number
-  name: string
-  fields: string[]
-}
-
-interface WebSocketConfig {
-  url: string
-  reconnect: boolean
-  reconnectInterval: number
-}
-
-interface CanvasConfig {
-  items: {
-    id: number
-    type: string
-    x: number
-    y: number
-    width: number
-    height: number
-  }[]
-}
-
-type ConfigKey = keyof typeof defaultConfigs
-
-const defaultConfigs = {
-  serial: {
-    baudRate: 115200,
-    dataBits: 8,
-    stopBits: 1,
-    parity: 'none',
-    flowControl: 'none'
-  } as SerialConfig,
-  
-  websocket: {
-    url: 'ws://localhost:8080',
-    reconnect: false,
-    reconnectInterval: 3000
-  } as WebSocketConfig,
-  
-  display: {
-    showTime: true,
-    showMs: false,
-    showHex: true,
-    showText: true,
-    showNewline: true,
-    autoScroll: false,
-    timeOut: 5
-  } as DisplayConfig,
-
-  send: {
-    isHexSend: false,
-    addCRLF: false,
-    addCRLFType: "\n",
-    autoSend: false,
-    autoSendInterval: 1000,
-    addChecksum: false,
-    content: "",
-    history: [],
-    historyMaxLength: 100
-  } as SendConfig,
-
-  layout: {
-    splitPaneSize: 75,
-    leftActiveTab: '0',
-    rightActiveTab: '0'
-  } as LayoutConfig,
-
-  charts: {
-    list: [{
-      id: 1,
-      name: 'Chart 1',
-      fields: ['pitch', 'roll', 'yaw']
-    }] as ChartConfig[]
-  },
-  canvas: {
-    items: []
-  } as CanvasConfig,
+const defaultConfigs: Record<string, any> = {
+  serial: defaultSerialConfig,
+  websocket: defaultWebSocketConfig,
+  display: defaultDisplayConfig,
+  send: defaultSendConfig,
+  layout: defaultLayoutConfig,
+  charts: { list: [] },
+  canvas: { items: [] }
 }
 
 export class ConfigManager {
   private static instance: ConfigManager
   private configs: Record<string, any> = {}
+  private initialized = false
 
-  private constructor() {
-    this.loadAllConfigs()
-  }
+  private constructor() {}
 
   public static getInstance(): ConfigManager {
     if (!ConfigManager.instance) {
@@ -131,24 +29,69 @@ export class ConfigManager {
     return ConfigManager.instance
   }
 
-  private loadAllConfigs() {
+  public init(): void {
+    if (this.initialized) return
+    
+    const storage = getStorage()
+    this.migrateLegacyConfigs(storage)
+    
     for (const [key, defaultValue] of Object.entries(defaultConfigs)) {
-      const savedValue = localStorage.getItem(`config.${key}`)
-      this.configs[key] = savedValue ? { ...defaultValue, ...JSON.parse(savedValue) } : defaultValue
+      const savedValue = storage.get(`config.${key}`)
+      this.configs[key] = savedValue ? { ...defaultValue, ...savedValue } : { ...defaultValue }
+    }
+    
+    this.initialized = true
+  }
+
+  private migrateLegacyConfigs(storage: StorageAdapter): void {
+    const legacyKeys = [
+      'config.serial',
+      'config.display',
+      'config.send',
+      'config.layout',
+      'config.charts',
+      'config.canvas',
+      'config.websocket'
+    ]
+
+    for (const key of legacyKeys) {
+      const newKey = key.replace('config.', '')
+      const value = storage.get(newKey)
+      if (!value) {
+        try {
+          const legacyValue = localStorage.getItem(key)
+          if (legacyValue) {
+            storage.set(newKey, JSON.parse(legacyValue))
+            localStorage.removeItem(key)
+          }
+        } catch { /* ignore */ }
+      }
     }
   }
 
-  public getConfig<T extends ConfigKey>(key: T): typeof defaultConfigs[T] {
+  public getConfig<T = any>(key: string): T {
+    if (!this.initialized) {
+      this.init()
+    }
     return this.configs[key] || defaultConfigs[key]
   }
 
-  public setConfig<T extends ConfigKey>(key: T, value: Partial<typeof defaultConfigs[T]>) {
+  public setConfig<T = any>(key: string, value: Partial<T>): void {
+    if (!this.initialized) {
+      this.init()
+    }
+    
     this.configs[key] = { ...this.configs[key], ...value }
-    localStorage.setItem(`config.${key}`, JSON.stringify(this.configs[key]))
+    const storage = getStorage()
+    storage.set(`config.${key}`, this.configs[key])
   }
 
-  public useConfig<T extends ConfigKey>(key: T) {
-    const config = ref(this.getConfig(key))
+  public useConfig<T = any>(key: string) {
+    if (!this.initialized) {
+      this.init()
+    }
+    
+    const config = ref(this.getConfig<T>(key))
 
     watch(config, (newValue) => {
       this.setConfig(key, newValue)
@@ -157,14 +100,18 @@ export class ConfigManager {
     return config
   }
 
-  public resetConfig(key: ConfigKey) {
+  public resetConfig(key: string) {
+    if (!this.initialized) {
+      this.init()
+    }
     this.configs[key] = { ...defaultConfigs[key] }
-    localStorage.setItem(`config.${key}`, JSON.stringify(this.configs[key]))
+    const storage = getStorage()
+    storage.set(`config.${key}`, this.configs[key])
   }
 
   public resetAllConfigs() {
     Object.keys(defaultConfigs).forEach(key => {
-      this.resetConfig(key as ConfigKey)
+      this.resetConfig(key)
     })
   }
 }
