@@ -13,8 +13,8 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 try { particleFire.install( { THREE: THREE } ); } catch (e) { }
 
-import { WaterRocketPhysics } from '../../utils/WaterRocketPhysics'
-import { MultiStageRocketPhysics } from '../../utils/MultiStageRocketPhysics'
+import { WaterRocketPhysics } from './WaterRocketPhysics'
+import { MultiStageRocketPhysics } from './MultiStageRocketPhysics'
 
 interface Props {
   readonly?: boolean
