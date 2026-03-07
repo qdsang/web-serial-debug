@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'web-serial-debug-cache-v3';
+const CACHE_NAME = 'web-serial-debug-cache-v4';
 const urlsToCache = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ self.addEventListener('install', (event) => {
         return cache.addAll(urlsToCache);
       })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -55,4 +56,11 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  self.clients.claim();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
