@@ -2,9 +2,9 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useFieldStore } from '../../store/fieldStore'
-import { ConfigManager } from '../../utils/ConfigManager'
 import LineChart from './LineChart.vue'
 import { EventCenter, EventNames } from '../../utils/EventCenter'
+import { ProfileManagerInst } from '../../utils/ProfileManager'
 
 interface Props {
   readonly?: boolean
@@ -20,6 +20,7 @@ const emit = defineEmits<{
 
 const eventCenter = EventCenter.getInstance()
 const fieldStore = useFieldStore()
+const profileManager = ProfileManagerInst
 
 interface ChartConfig {
   id: number
@@ -29,8 +30,27 @@ interface ChartConfig {
   timestamps: number[]
 }
 
-const configManager = ConfigManager.getInstance()
-const chartConfig = configManager.useConfig('charts')
+const chartConfig = computed(() => {
+  const profile = profileManager.activeProfile
+  return profile?.config?.charts as { list: any[] } | undefined
+})
+
+const defaultChartConfig = { list: [] }
+
+const localChartConfig = computed({
+  get: () => chartConfig.value || defaultChartConfig,
+  set: (val: { list: any[] }) => {
+    const profile = profileManager.activeProfile
+    if (profile) {
+      profileManager.updateProfile(profile.id, {
+        config: {
+          ...profile.config,
+          charts: { ...val }
+        }
+      })
+    }
+  }
+})
 
 const charts = ref<ChartConfig[]>([])
 let nextChartId = computed(() => {
@@ -66,11 +86,11 @@ const saveChartsConfig = () => {
     name: chart.name,
     fields: chart.fields
   }))
-  chartConfig.value.list = config
+  localChartConfig.value = { list: config }
 }
 
 const loadChartsConfig = () => {
-  const config = chartConfig.value.list || []
+  const config = localChartConfig.value.list || []
   if (!Array.isArray(config)) return
 
   config.forEach(chartData => {

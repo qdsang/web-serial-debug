@@ -1,58 +1,90 @@
 import { ref, computed } from 'vue'
 import { getStorage } from './StorageAdapter'
-import {
-  type Profile,
-  type SavedDevice,
-  type DeviceStore
-} from './ProfileTypes'
+import { type SavedDevice, type DeviceStore } from './ProfileTypes'
 import { defaultSerialConfig, defaultWebSocketConfig } from '../devices/types'
-import { defaultDisplayConfig, defaultSendConfig } from '../components/types'
+import { defaultDisplayConfig, defaultSendConfig, defaultLayoutConfig, defaultChartConfig, defaultCanvasConfig } from '../components/types'
 
-const PROFILES_KEY = 'profiles'
+const WORKSPACES_KEY = 'workspaces'
 const DEVICES_KEY = 'devices'
+const ACTIVE_WORKSPACE_KEY = 'activeWorkspaceId'
+
+export interface Workspace {
+  id: string
+  name: string
+  deviceId: string | null
+  deviceType: string | null
+  config: Record<string, any>
+  createdAt: number
+  updatedAt: number
+}
 
 const defaultConfig = {
   serial: defaultSerialConfig,
   websocket: defaultWebSocketConfig,
   display: defaultDisplayConfig,
-  send: defaultSendConfig
+  send: defaultSendConfig,
+  layout: defaultLayoutConfig,
+  charts: defaultChartConfig,
+  canvas: defaultCanvasConfig,
+  fields: [],
+  columnVisibility: {},
+  quickSendGroups: [],
+  script: null,
+  savedDevice: null
 }
 
-class ProfileManager {
-  private static instance: ProfileManager
-  private profiles = ref<Profile[]>([])
+export const isConnected = ref(false)
+export const connectedDeviceId = ref<string | null>(null)
+
+class WorkspaceManager {
+  private static instance: WorkspaceManager
+  private workspaces = ref<Workspace[]>([])
   private deviceStore = ref<DeviceStore>({
     savedDevices: [],
     activeDeviceId: null,
     activeProfileId: null
   })
+  private activeWorkspaceId = ref<string | null>(null)
+  private workspaceChangeCallbacks: Array<(workspace: Workspace | null) => void> = []
 
   private constructor() {
     this.loadAll()
   }
 
-  public static getInstance(): ProfileManager {
-    if (!ProfileManager.instance) {
-      ProfileManager.instance = new ProfileManager()
+  public static getInstance(): WorkspaceManager {
+    if (!WorkspaceManager.instance) {
+      WorkspaceManager.instance = new WorkspaceManager()
     }
-    return ProfileManager.instance
+    return WorkspaceManager.instance
   }
 
   private loadAll(): void {
     const storage = getStorage()
-    const profiles = storage.get<Profile[]>(PROFILES_KEY)
-    if (profiles) {
-      this.profiles.value = profiles
+    const workspaces = storage.get<Workspace[]>(WORKSPACES_KEY)
+    if (workspaces) {
+      this.workspaces.value = workspaces
     }
     const devices = storage.get<DeviceStore>(DEVICES_KEY)
     if (devices) {
       this.deviceStore.value = devices
     }
+    const activeWorkspaceId = storage.get<string>(ACTIVE_WORKSPACE_KEY)
+    if (activeWorkspaceId) {
+      this.activeWorkspaceId.value = activeWorkspaceId
+    }
+    
+    if (this.workspaces.value.length === 0) {
+      this.createWorkspace('默认工作区')
+    }
+    
+    if (!this.activeWorkspaceId.value && this.workspaces.value.length > 0) {
+      this.setActiveWorkspace(this.workspaces.value[0].id)
+    }
   }
 
-  private saveProfiles(): void {
+  private saveWorkspaces(): void {
     const storage = getStorage()
-    storage.set(PROFILES_KEY, this.profiles.value)
+    storage.set(WORKSPACES_KEY, this.workspaces.value)
   }
 
   private saveDevices(): void {
@@ -60,101 +92,136 @@ class ProfileManager {
     storage.set(DEVICES_KEY, this.deviceStore.value)
   }
 
-  get profilesRef() {
-    return this.profiles
+  private saveActiveWorkspace(): void {
+    const storage = getStorage()
+    storage.set(ACTIVE_WORKSPACE_KEY, this.activeWorkspaceId.value)
+  }
+
+  onWorkspaceChange(callback: (workspace: Workspace | null) => void): void {
+    this.workspaceChangeCallbacks.push(callback)
+  }
+
+  private notifyWorkspaceChange(): void {
+    this.workspaceChangeCallbacks.forEach(cb => cb(this.activeWorkspace))
+  }
+
+  get workspacesRef() {
+    return this.workspaces
   }
 
   get deviceStoreRef() {
     return this.deviceStore
   }
 
-  get activeProfileId() {
-    return computed(() => this.deviceStore.value.activeProfileId)
+  get activeWorkspaceIdRef() {
+    return this.activeWorkspaceId
+  }
+
+  get activeWorkspaceIdComputed() {
+    return computed(() => this.activeWorkspaceId.value)
   }
 
   get activeDeviceId() {
     return computed(() => this.deviceStore.value.activeDeviceId)
   }
 
-  get activeProfile(): Profile | null {
-    if (!this.deviceStore.value.activeProfileId) {
+  get activeWorkspace(): Workspace | null {
+    if (!this.activeWorkspaceId.value) {
       return null
     }
-    return this.profiles.value.find(p => p.id === this.deviceStore.value.activeProfileId) || null
+    return this.workspaces.value.find(p => p.id === this.activeWorkspaceId.value) || null
   }
 
-  get activeProfileRef() {
-    return computed(() => this.activeProfile)
+  get activeWorkspaceRef() {
+    return computed(() => this.activeWorkspace)
   }
 
-  getProfilesByDevice(deviceId: string | null): Profile[] {
+  getWorkspacesByDevice(deviceId: string | null): Workspace[] {
     if (!deviceId) {
-      return this.profiles.value.filter(p => !p.deviceId)
+      return this.workspaces.value.filter(p => !p.deviceId)
     }
-    return this.profiles.value.filter(p => p.deviceId === deviceId || !p.deviceId)
+    return this.workspaces.value.filter(p => p.deviceId === deviceId || !p.deviceId)
   }
 
-  createProfile(options: {
-    name: string
+  createWorkspace(name: string, options?: {
     deviceId?: string | null
     deviceType?: string | null
-    config?: Record<string, any>
-  }): Profile {
+  }): Workspace {
     const now = Date.now()
-    const id = `${options.deviceType || 'profile'}_${options.name.toLowerCase().replace(/\s+/g, '_')}_${now}`
+    const id = `workspace_${name.toLowerCase().replace(/\s+/g, '_')}_${now}`
     
-    const config = { ...defaultConfig, ...options.config }
+    const config = JSON.parse(JSON.stringify(defaultConfig))
     
-    const profile: Profile = {
+    const workspace: Workspace = {
       id,
-      name: options.name,
-      deviceId: options.deviceId || null,
-      deviceType: options.deviceType || null,
+      name,
+      deviceId: options?.deviceId || null,
+      deviceType: options?.deviceType || null,
       config,
       createdAt: now,
       updatedAt: now
     }
 
-    this.profiles.value.push(profile)
-    this.saveProfiles()
-    return profile
+    this.workspaces.value.push(workspace)
+    this.saveWorkspaces()
+    return workspace
   }
 
-  updateProfile(profileId: string, updates: Partial<Profile>): void {
-    const index = this.profiles.value.findIndex(p => p.id === profileId)
+  setActiveWorkspace(workspaceId: string): void {
+    this.activeWorkspaceId.value = workspaceId
+    this.saveActiveWorkspace()
+    this.notifyWorkspaceChange()
+  }
+
+  renameWorkspace(workspaceId: string, newName: string): void {
+    this.updateWorkspace(workspaceId, { name: newName })
+  }
+
+  deleteWorkspace(workspaceId: string): void {
+    this.deleteWorkspaceById(workspaceId)
+  }
+
+  duplicateWorkspace(workspaceId: string, newName: string): Workspace | null {
+    const original = this.workspaces.value.find(p => p.id === workspaceId)
+    if (!original) return null
+
+    return this.createWorkspace(newName, {
+      deviceId: original.deviceId,
+      deviceType: original.deviceType
+    })
+  }
+
+  updateWorkspace(workspaceId: string, updates: Partial<Workspace>): void {
+    const index = this.workspaces.value.findIndex(p => p.id === workspaceId)
     if (index >= 0) {
-      this.profiles.value[index] = {
-        ...this.profiles.value[index],
+      this.workspaces.value[index] = {
+        ...this.workspaces.value[index],
         ...updates,
         updatedAt: Date.now()
       }
-      this.saveProfiles()
+      this.saveWorkspaces()
     }
   }
 
-  deleteProfile(profileId: string): void {
-    const index = this.profiles.value.findIndex(p => p.id === profileId)
+  deleteWorkspaceById(workspaceId: string): void {
+    const index = this.workspaces.value.findIndex(p => p.id === workspaceId)
     if (index >= 0) {
-      this.profiles.value.splice(index, 1)
-      this.saveProfiles()
+      this.workspaces.value.splice(index, 1)
+      this.saveWorkspaces()
       
-      if (this.deviceStore.value.activeProfileId === profileId) {
+      if (this.deviceStore.value.activeProfileId === workspaceId) {
         this.deviceStore.value.activeProfileId = null
         this.saveDevices()
       }
+      
+      if (this.activeWorkspaceId.value === workspaceId) {
+        if (this.workspaces.value.length > 0) {
+          this.setActiveWorkspace(this.workspaces.value[0].id)
+        } else {
+          this.createWorkspace('默认工作区')
+        }
+      }
     }
-  }
-
-  duplicateProfile(profileId: string, newName: string): Profile | null {
-    const original = this.profiles.value.find(p => p.id === profileId)
-    if (!original) return null
-
-    return this.createProfile({
-      name: newName,
-      deviceId: original.deviceId,
-      deviceType: original.deviceType,
-      config: original.config
-    })
   }
 
   saveDevice(device: SavedDevice): void {
@@ -185,11 +252,11 @@ class ProfileManager {
     return this.deviceStore.value.savedDevices.find(d => d.id === deviceId) || null
   }
 
-  setActiveDevice(deviceId: string | null, profileId?: string | null): void {
+  setActiveDevice(deviceId: string | null, workspaceId?: string | null): void {
     this.deviceStore.value.activeDeviceId = deviceId
     
-    if (profileId !== undefined) {
-      this.deviceStore.value.activeProfileId = profileId
+    if (workspaceId !== undefined) {
+      this.deviceStore.value.activeProfileId = workspaceId
     } else if (deviceId) {
       const device = this.getSavedDevice(deviceId)
       if (device?.lastProfileId) {
@@ -202,41 +269,68 @@ class ProfileManager {
     this.saveDevices()
   }
 
-  setActiveProfile(profileId: string | null): void {
-    this.deviceStore.value.activeProfileId = profileId
+  setActiveWorkspaceProfile(workspaceId: string | null): void {
+    this.deviceStore.value.activeProfileId = workspaceId
     
-    if (this.deviceStore.value.activeDeviceId && profileId) {
+    if (this.deviceStore.value.activeDeviceId && workspaceId) {
       const device = this.getSavedDevice(this.deviceStore.value.activeDeviceId)
       if (device) {
-        device.lastProfileId = profileId
+        device.lastProfileId = workspaceId
         this.saveDevices()
       }
     }
   }
 
-  getOrCreateDefaultProfile(deviceId?: string, deviceType?: string): Profile {
-    let profile = this.activeProfile
+  getOrCreateDefaultWorkspace(deviceId?: string, deviceType?: string): Workspace {
+    let workspace = this.activeWorkspace
     
-    if (!profile && deviceId) {
-      const deviceProfiles = this.getProfilesByDevice(deviceId)
-      profile = deviceProfiles[0]
+    if (!workspace && deviceId) {
+      const deviceWorkspaces = this.getWorkspacesByDevice(deviceId)
+      workspace = deviceWorkspaces[0]
     }
     
-    if (!profile) {
-      profile = this.createProfile({
-        name: '默认配置',
+    if (!workspace) {
+      workspace = this.createWorkspace('默认配置', {
         deviceId: deviceId || null,
         deviceType: deviceType || null
       })
     }
     
-    return profile
+    return workspace
   }
 
   getDefaultConfig() {
     return defaultConfig
   }
+
+  get activeProfile() {
+    return this.activeWorkspace
+  }
+
+  get activeProfileRef() {
+    return computed(() => this.activeWorkspace)
+  }
+
+  updateProfile(workspaceId: string, updates: Partial<Workspace>): void {
+    this.updateWorkspace(workspaceId, updates)
+  }
+
+  createProfile(name: string, options?: {
+    deviceId?: string | null
+    deviceType?: string | null
+  }): Workspace {
+    return this.createWorkspace(name, options)
+  }
+
+  setActiveProfile(workspaceId: string): void {
+    this.setActiveWorkspace(workspaceId)
+  }
+
+  onProfileChange(callback: (workspace: Workspace | null) => void): void {
+    this.onWorkspaceChange(callback)
+  }
 }
 
-export const ProfileManagerInst = ProfileManager.getInstance()
-export { ProfileManager }
+export const WorkspaceManagerInst = WorkspaceManager.getInstance()
+export const ProfileManagerInst = WorkspaceManagerInst
+export { WorkspaceManager }

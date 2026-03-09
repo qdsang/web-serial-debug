@@ -6,13 +6,14 @@ import { defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { javascript } from '@codemirror/lang-javascript'
 import { oneDark, oneDarkHighlightStyle } from '@codemirror/theme-one-dark'
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
-import { ScriptManager, type ScriptItem } from '../utils/ScriptManager'
+import { ScriptManager } from '../utils/ScriptManager'
 import { useDark } from '@vueuse/core'
+import { WorkspaceManagerInst } from '../utils/ProfileManager'
 
 const scriptManager = ScriptManager.getInstance()
-const scripts = ref<ScriptItem[]>(scriptManager.getScripts())
-const currentScript = ref<ScriptItem>(scriptManager.getCurrentScript())
-const currentScriptId = ref<number>(currentScript.value.id)
+const workspaceManager = WorkspaceManagerInst
+
+const currentScript = ref(scriptManager.getScript())
 const editor = ref<EditorView | null>(null)
 const isDark = useDark()
 
@@ -24,42 +25,13 @@ const editorSetValue = (content: string) => {
   }
 }
 
-const setCurrentScript = (script: ScriptItem) => {
-  scriptManager.setCurrentScript(script)
-  currentScript.value = script
-  editorSetValue(script.code)
-
-  currentScriptId.value = currentScript.value.id
-}
-
-const addScript = () => {
-  const newScript = scriptManager.addScript()
-  scripts.value = scriptManager.getScripts()
-  setCurrentScript(newScript)
-}
-
-const removeScript = (id: number) => {
-  scriptManager.removeScript(id)
-  scripts.value = scriptManager.getScripts()
-  if (scripts.value.length == 0) {
-    addScript()
-  }
-  setCurrentScript(scripts.value[0])
-}
-
 const runScript = async () => {
   if (currentScript.value.isRunning) {
     await scriptManager.stopScript()
   } else {
     await scriptManager.runScript()
   }
-}
-
-const handleScriptChange = () => {
-  const selected = scripts.value.find(script => script.id === currentScriptId.value)
-  if (selected) {
-    setCurrentScript(selected)
-  }
+  currentScript.value = scriptManager.getScript()
 }
 
 const createEditor = () => {
@@ -77,6 +49,7 @@ const createEditor = () => {
         EditorView.updateListener.of(update => {
           if (update.docChanged) {
             currentScript.value.code = update.state.doc.toString()
+            scriptManager.updateScript({ code: currentScript.value.code })
           }
         })
       ]
@@ -91,6 +64,10 @@ const createEditor = () => {
 
 onMounted(() => {
   createEditor()
+  workspaceManager.onWorkspaceChange(() => {
+    currentScript.value = scriptManager.getScript()
+    editorSetValue(currentScript.value.code)
+  })
 })
 
 watch(isDark, () => {
@@ -99,31 +76,10 @@ watch(isDark, () => {
     createEditor()
   }
 })
-
-watch(scripts, () => {
-  scriptManager.saveScripts()
-}, { deep: true })
 </script>
 
 <template>
   <div class="serial-script">
-    <div class="script-select">
-      <el-select size="small" v-model="currentScriptId" @change="handleScriptChange" placeholder="选择脚本">
-        <el-option
-          v-for="script in scripts"
-          :key="script.id"
-          :label="script.name"
-          :value="script.id"
-        />
-      </el-select>
-      <el-button-group class="ms-2" style="width: 250px;">
-        <el-button size="small" @click="addScript">
-          <el-icon><Plus /></el-icon> 新建
-        </el-button>
-        <el-button size="small" type="danger" @click="removeScript(currentScript.id)">删除</el-button>
-      </el-button-group>
-    </div>
-
     <div class="script-editor">
       <div class="script-name-container">
         <el-input
@@ -131,6 +87,7 @@ watch(scripts, () => {
           v-model="currentScript.name"
           placeholder="脚本名称"
           class="script-name-input"
+          @change="scriptManager.updateScript({ name: currentScript.name })"
         />
         <el-button
           :type="currentScript.isRunning ? 'success' : 'primary'"
@@ -170,12 +127,6 @@ watch(scripts, () => {
   min-width: 300px;
 }
 
-.script-select {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .script-editor {
   padding: 8px 0;
 }
@@ -199,7 +150,6 @@ watch(scripts, () => {
   margin-left: 8px;
 }
 
-/* CodeMirror样式覆盖 */
 :deep(.CodeMirror) {
   height: 800px;
   border: 1px solid #dcdfe6;

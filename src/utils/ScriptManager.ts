@@ -5,7 +5,7 @@ import { ProfileManagerInst } from './ProfileManager'
 
 const eventCenter = EventCenter.getInstance()
 
-export interface ScriptItem {
+export interface Script {
   id: number
   name: string
   code: string
@@ -17,7 +17,7 @@ export interface Runtimer {
   DataSenderInterface: Function | null
 }
 
-const demo1 = `let cache = '';
+const demoCode = `let cache = '';
 
 // 处理接收的数据
 async function DataReceiver(data) {
@@ -47,33 +47,23 @@ async function DataReceiver(data) {
 
 // 处理发送的数据
 async function DataSender(data) {
-  // checksum
-  // await sleep(10);
-
   return data;
 }
 
-// 定时发送数据
-setInterval(async () => {
-  const bytes = new Uint8Array(3);
-  // sendHex(bytes);
-}, 1000);
-
 // 支持的函数
-// stringToUint8Array();
-// uint8ArrayToHexString();
-// uint8ArrayToString();
+// sendText(text) - 发送文本
+// sendHex(hex) - 发送HEX
+// sleep(ms) - 延时
+// updateDataTable({}) - 更新数据表
 
 `;
 
-
 export class ScriptManager {
   private static instance: ScriptManager
-  private scripts: ScriptItem[] = []
-  public currentScript: ScriptItem = {
-    id: Date.now(),
-    name: '新建脚本',
-    code: '',
+  private script: Script = {
+    id: 1,
+    name: '数据处理脚本',
+    code: demoCode,
     isRunning: false
   }
   private serialHelper = SerialHelper.getInstance()
@@ -87,7 +77,7 @@ export class ScriptManager {
   private RuntimerTimerouts: number[] = []
 
   private constructor() {
-    this.loadScripts()
+    this.loadScript()
   }
 
   public static getInstance(): ScriptManager {
@@ -97,52 +87,21 @@ export class ScriptManager {
     return ScriptManager.instance
   }
 
-  public getScripts(): ScriptItem[] {
-    return this.scripts
+  public getScript(): Script {
+    return this.script
   }
 
-  public getCurrentScript(): ScriptItem {
-    return this.currentScript
-  }
-
-  public setCurrentScript(script: ScriptItem): void {
-    this.currentScript = script
-  }
-
-  public addScript(title: string = '新脚本', code: string = demo1): ScriptItem {
-    const newScript: ScriptItem = {
-      id: Date.now(),
-      name: title,
-      code: code,
-      isRunning: false
-    }
-    this.scripts.push(newScript)
-    this.currentScript = newScript
-    this.saveScripts()
-    return newScript
-  }
-
-  public removeScript(id: number): void {
-    const index = this.scripts.findIndex(script => script.id === id)
-    if (index > -1) {
-      this.scripts.splice(index, 1)
-      if (this.currentScript.id === id) {
-        if (this.scripts.length === 0) {
-          this.addScript()
-        }
-        this.currentScript = this.scripts[0]
-      }
-      this.saveScripts()
-    }
+  public updateScript(updates: Partial<Script>): void {
+    this.script = { ...this.script, ...updates }
+    this.saveScript()
   }
 
   public async runScript(): Promise<void> {
-    let script = this.currentScript
-    if (script.isRunning) {
+    if (this.script.isRunning) {
       return
     }
 
-    script.isRunning = true
+    this.script.isRunning = true
 
     try {
       const scriptContext = {
@@ -182,8 +141,7 @@ export class ScriptManager {
 
       const wrappedCode = `
 return (async function() {
-  ${script.code}
-
+  ${this.script.code}
 
   let DataReceiverInterface = typeof DataReceiver == 'undefined' ? null : DataReceiver;
   let DataSenderInterface = typeof DataSender == 'undefined'? null : DataSender;
@@ -196,15 +154,13 @@ return (async function() {
       
     } catch (error) {
       console.error('脚本执行错误:', error)
-
       eventCenter.emit(EventNames.SERIAL_ERROR, { error: error instanceof Error ? error.message : '未知错误' })
       this.stopScript()
     }
-
   }
 
   public stopScript(): void {
-    this.currentScript.isRunning = false
+    this.script.isRunning = false
 
     this.RuntimerTimerouts.forEach(clearTimeout)
     this.RuntimerTimerouts = []
@@ -213,42 +169,42 @@ return (async function() {
   }
 
   public async getRuntimer(): Promise<Runtimer> {
-    if (!this.currentScript.isRunning) {
+    if (!this.script.isRunning) {
       await this.runScript()
     }
     return this.runtimer
   }
 
-  public saveScripts(): void {
+  public saveScript(): void {
     const profile = this.profileManager.activeProfile
     if (profile) {
       this.profileManager.updateProfile(profile.id, {
         config: {
           ...profile.config,
-          scripts: this.scripts
+          script: { ...this.script }
         }
       })
     }
   }
 
-  private loadScripts(): void {
+  private loadScript(): void {
     const profile = this.profileManager.activeProfile
-    const savedScripts = profile?.config?.scripts as ScriptItem[] | undefined
+    const savedScript = profile?.config?.script as Script | undefined
     
-    if (savedScripts && savedScripts.length > 0) {
-      this.scripts = savedScripts
+    if (savedScript && savedScript.code) {
+      this.script = { ...savedScript, isRunning: false }
     } else {
-      this.addScript('数据处理Demo（key:val,key:val）', demo1)
+      this.script = {
+        id: 1,
+        name: '数据处理脚本',
+        code: demoCode,
+        isRunning: false
+      }
+      this.saveScript()
     }
-    
-    this.scripts.map((script) => {
-      script.isRunning = false
-    })
-
-    this.currentScript = this.scripts[0] || this.currentScript
   }
 
   public reloadFromProfile(): void {
-    this.loadScripts()
+    this.loadScript()
   }
 }

@@ -80,6 +80,10 @@ export const useQuickSendStore = defineStore('quickSend', () => {
     setCurrentGroup(groups.value[0])
   }
 
+  profileManager.onProfileChange(() => {
+    loadFromProfile()
+  })
+
   const saveToProfile = () => {
     const profile = profileManager.activeProfile
     if (profile) {

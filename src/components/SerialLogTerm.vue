@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { SerialHelper } from '../utils/SerialHelper'
-import { ConfigManager } from '../utils/ConfigManager'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import { SearchAddon } from '@xterm/addon-search';
@@ -9,14 +8,24 @@ import { useDark } from '@vueuse/core'
 import 'xterm/css/xterm.css'
 
 import { EventCenter, EventNames } from '../utils/EventCenter'
+import { useWorkspaceConfig } from '../utils/useWorkspaceConfig'
+import type { DisplayConfig } from './types'
 
 const eventCenter = EventCenter.getInstance()
 
-const configManager = ConfigManager.getInstance()
-const displayConfig = configManager.useConfig('display')
+const defaultDisplayConfig: DisplayConfig = {
+  showTime: true,
+  showMs: false,
+  showHex: true,
+  showText: true,
+  showNewline: true,
+  autoScroll: false,
+  timeOut: 5
+}
+
+const { config: logOptions } = useWorkspaceConfig<DisplayConfig>('display', defaultDisplayConfig)
 const isDark = useDark()
 
-const logOptions = ref(displayConfig.value)
 const serialHelper = SerialHelper.getInstance()
 let logBufferAll: string[] = []
 let logBuffer = new Uint8Array()
@@ -24,7 +33,6 @@ let timeoutId: number | null = null
 let timeoutDelt: number = 0
 let terminal: Terminal | null = null
 let fitAddon: FitAddon | null = null
-// let terminalWriteBuffer = new Uint8Array()
 const receivedBytes = ref(0)
 
 const clearLog = () => {
@@ -58,7 +66,7 @@ const initTerminal = () => {
     fontFamily: 'Consolas,Liberation Mono,Menlo,Courier,monospace',
     fontSize: 14,
     theme: getTerimalTheme(isDark.value),
-    scrollback: 10000  // 增加缓冲区大小到10000行
+    scrollback: 10000
   })
   
   const searchAddon = new SearchAddon();
@@ -83,21 +91,7 @@ const initTerminal = () => {
 
 \x1b[0m
 \x1b[35m=== Serial Tool ===\x1b[0m
-\x1b[32m版本: v2.2.0\x1b[0m
-\x1b[0m
-功能特点:
-- 🔌 支持串口和WebUSB设备连接
-- 📝 实时数据收发显示
-- 🎨 支持文本和HEX格式数据发送
-- 📜 支持自定义脚本编写和执行
-- 🎯 快捷发送功能
-- ⚙️ 可配置的显示选项
-- 🌙 暗色主题支持
-
-\x1b[33m开始使用:
-1. 点击顶部的连接按钮选择设备
-2. 配置设备参数（波特率等）
-3. 开始接收/发送数据\x1b[0m
+\x1b[32m版本: v2.3.0\x1b[0m
 
 `
     terminal.write(logo)
@@ -110,8 +104,7 @@ const initTerminal = () => {
 
 const toggleOption = (option: string) => {
   if (option in logOptions.value) {
-    // @ts-ignore
-    logOptions.value[option] = !logOptions.value[option as keyof typeof logOptions.value]
+    (logOptions.value as any)[option] = !(logOptions.value as any)[option]
   }
 }
 
@@ -147,21 +140,14 @@ const processSerialData = (data: Uint8Array) => {
 const processSerialDataHanlde = () => {
   const message = serialHelper.formatLogMessage(logBuffer, logOptions.value)
   if (terminal) {
-    // terminalWriteBuffer = new Uint8Array([...terminalWriteBuffer, ...message])
     requestAnimationFrame(() => {
       if (terminal) {
-        // let buff = terminalWriteBuffer
-        // terminalWriteBuffer = new Uint8Array()
         terminal.write(message)
         if (logOptions.value.autoScroll) {
           terminal.scrollToBottom()
         }
       }
     })
-    // terminal.write(message)
-    // if (logOptions.value.autoScroll) {
-    //   terminal.scrollToBottom()
-    // }
     logBufferAll.push(message)
   }
   logBuffer = new Uint8Array()
@@ -182,7 +168,6 @@ const handleResize = () => {
 const termWriteHandle = (data: Uint8Array) => {
   if (terminal) {
     let str = serialHelper.uint8ArrayToString(data)
-    // console.log('termWriteHandle', str, str.length)
     terminal.write(str)
   }
 }
@@ -325,8 +310,6 @@ const exportLog = () => {
 
 <style scoped>
 .serial-log {
-  /* margin-bottom: 10px; */
-  /* height: 100%; */
   display: flex;
   flex-direction: column;
 }
@@ -343,7 +326,6 @@ const exportLog = () => {
 
 .terminal-container {
   height: 100%;
-  /* background-color: #1e1e1e; */
 }
 
 #terminal {

@@ -1,17 +1,68 @@
 <script setup lang="ts">
 import { SerialHelper } from '../utils/SerialHelper'
-import { ConfigManager } from '../utils/ConfigManager'
 import { ElMessage } from 'element-plus'
+import { ref, watch, onMounted } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 
 import { EventCenter, EventNames } from '../utils/EventCenter'
+import { WorkspaceManagerInst } from '../utils/ProfileManager'
+import type { SendConfig } from './types'
 
 const eventCenter = EventCenter.getInstance()
+const workspaceManager = WorkspaceManagerInst
 
-const configManager = ConfigManager.getInstance()
-const sendConfig = configManager.useConfig('send')
+const defaultSendConfig: SendConfig = {
+  isHexSend: false,
+  addCRLF: false,
+  addCRLFType: '\n',
+  autoSend: false,
+  autoSendInterval: 1000,
+  addChecksum: false,
+  content: '',
+  history: [],
+  historyMaxLength: 100
+}
+
+const sendConfig = ref<SendConfig>({ ...defaultSendConfig })
+
+const loadFromProfile = () => {
+  const workspace = workspaceManager.activeWorkspace
+  if (workspace?.config?.send) {
+    sendConfig.value = { ...workspace.config.send as SendConfig }
+  }
+}
+
+const saveToProfile = useDebounceFn(() => {
+  const workspace = workspaceManager.activeWorkspace
+  if (workspace) {
+    workspaceManager.updateWorkspace(workspace.id, {
+      config: {
+        ...workspace.config,
+        send: { ...sendConfig.value }
+      }
+    })
+  }
+}, 300)
+
+let lastWorkspaceId: string | null = null
+
+onMounted(() => {
+  loadFromProfile()
+  lastWorkspaceId = workspaceManager.activeWorkspaceIdRef.value || null
+  
+  workspaceManager.onWorkspaceChange(() => {
+    if (workspaceManager.activeWorkspaceIdRef.value !== lastWorkspaceId) {
+      lastWorkspaceId = workspaceManager.activeWorkspaceIdRef.value
+      loadFromProfile()
+    }
+  })
+})
+
+watch(sendConfig, () => {
+  saveToProfile()
+}, { deep: true })
 
 let autoSendTimer: number | null = null
-
 const serialHelper = SerialHelper.getInstance()
 
 const sendData = () => {
@@ -25,10 +76,8 @@ const sendData = () => {
     if (sendConfig.value.addChecksum) {
       data = serialHelper.appendChecksum(data)
     }
-    // console.log('发送数据:', data, serialHelper.uint8ArrayToString(data))
     eventCenter.emit(EventNames.SERIAL_SEND, data)
     
-    // 添加到历史记录
     if (content && !sendConfig.value.history.includes(sendConfig.value.content)) {
       sendConfig.value.history.unshift(sendConfig.value.content)
       if (sendConfig.value.history.length > sendConfig.value.historyMaxLength) {
@@ -93,7 +142,6 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
   if (e.key === 'ArrowUp') {
     e.preventDefault()
-    // 第一次按向上键且有内容时，保存当前内容
     if (historyIndex === -1 && sendConfig.value.content.trim() && 
         !sendConfig.value.history.includes(sendConfig.value.content)) {
       sendConfig.value.history.unshift(sendConfig.value.content)
@@ -115,7 +163,6 @@ const handleKeyDown = (e: KeyboardEvent) => {
     }
   }
 }
-
 </script>
 
 <template>
@@ -165,7 +212,6 @@ const handleKeyDown = (e: KeyboardEvent) => {
 }
 
 .send-content {
-  /* margin-top: 12px; */
 }
 
 .me-2 {

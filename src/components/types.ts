@@ -64,6 +64,14 @@ export interface CanvasConfig {
   }[]
 }
 
+export const defaultChartConfig: { list: ChartConfig[] } = {
+  list: []
+}
+
+export const defaultCanvasConfig: CanvasConfig = {
+  items: []
+}
+
 export const defaultDisplayConfig: DisplayConfig = {
   showTime: true,
   showMs: false,

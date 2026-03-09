@@ -27,7 +27,7 @@ const addNewField = () => {
 }
 
 const updateField = () => {
-  fieldStore.saveToLocalStorage()
+  fieldStore.saveToProfile()
 }
 
 const resetData = () => {
@@ -40,11 +40,11 @@ const resetData = () => {
     field.updateCount = 0
     field.lastUpdate = 0
   })
-  fieldStore.saveToLocalStorage()
+  fieldStore.saveToProfile()
 }
 
 onMounted(() => {
-  fieldStore.loadFromLocalStorage()
+  fieldStore.loadFromProfile()
   eventCenter.on(EventNames.DATA_UPDATE, handleDataKey)
 })
 

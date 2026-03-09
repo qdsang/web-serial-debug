@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ConfigManager } from '../utils/ConfigManager'
 import { ScriptManager } from '../utils/ScriptManager'
 import { EventCenter, EventNames } from '../utils/EventCenter'
 import { isDesktop } from '../utils/Platform'
@@ -17,13 +16,74 @@ import * as DeviceWebSTLink from '../devices/webstlink'
 import * as DeviceDAPLink from '../devices/daplink'
 import { DesktopSerialDevice } from '../devices/desktop'
 
-const configManager = ConfigManager.getInstance()
-configManager.init()
-
 const profileManager = ProfileManagerInst
 const activeProfile = profileManager.activeProfileRef
-const serialConfig = computed(() => activeProfile.value?.config?.serial || configManager.getConfig('serial'))
-const wsConfig = computed(() => activeProfile.value?.config?.websocket || configManager.getConfig('websocket'))
+
+const savedDeviceConfig = computed(() => {
+  return activeProfile.value?.config?.savedDevice as {
+    deviceType: string
+    deviceId?: string
+    deviceTitle?: string
+  } | undefined
+})
+
+const getDeviceConfig = (device: Device) => {
+  return {
+    deviceType: device.type,
+    deviceId: device.id,
+    deviceTitle: device.title
+  }
+}
+
+const saveDeviceConfig = (device: Device) => {
+  const profile = activeProfile.value
+  if (profile) {
+    profileManager.updateProfile(profile.id, {
+      config: {
+        ...profile.config,
+        savedDevice: getDeviceConfig(device)
+      }
+    })
+  }
+}
+
+const loadSavedDevice = async () => {
+  const saved = savedDeviceConfig.value
+  if (!saved) return
+
+  if (isDesktop()) {
+    if (saved.deviceType === 'desktop-serial') {
+      try {
+        const ports = await DesktopSerialDevice.getAvailablePorts()
+        if (ports.length > 0) {
+          const selectedPort = saved.deviceId || ports[0]
+          const desktopDevice = new DesktopSerialDevice(selectedPort, 
+            activeProfile.value?.config?.serial?.baudRate || 115200)
+          const existingIndex = authorizedDevices.value.findIndex(d => d.id === desktopDevice.id)
+          if (existingIndex >= 0) {
+            authorizedDevices.value.splice(existingIndex, 1)
+          }
+          authorizedDevices.value.push(desktopDevice as unknown as Device)
+          selectedDeviceId.value = desktopDevice.id
+        }
+      } catch (e) {
+        console.error('加载保存的设备失败:', e)
+      }
+    }
+  } else {
+    const device = authorizedDevices.value.find(d => d.id === saved.deviceId)
+    if (device) {
+      selectedDeviceId.value = device.id
+    }
+  }
+}
+
+profileManager.onProfileChange(() => {
+  loadSavedDevice()
+})
+
+const serialConfig = computed(() => activeProfile.value?.config?.serial)
+const wsConfig = computed(() => activeProfile.value?.config?.websocket)
 
 const scriptManager = ScriptManager.getInstance()
 
@@ -129,7 +189,6 @@ const connectDevice = async (device: Device) => {
   }
   let port
   try {
-    // 使用新的标准接口方法
     port = await device.connect(serialConfig.value)
   } catch (error) {
     ElMessage.error('设备连接失败：' + error)
@@ -143,6 +202,7 @@ const connectDevice = async (device: Device) => {
     ElMessage.success('设备连接成功')
     startReading()
     selectedDeviceId.value = device.id
+    saveDeviceConfig(device)
   } else {
     // selectedDeviceId.value = ''
   }

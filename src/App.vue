@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import SerialConfig from './components/SerialConfig.vue'
+import { ref, computed, onMounted } from 'vue'
 import SerialLog from './components/SerialLog.vue'
 import PipelinePanel from './widgets/PipelinePanel/PipelinePanel.vue'
 import ChartIMU from './widgets/ChartIMU/ChartIMU.vue'
@@ -11,14 +10,35 @@ import DataTable from './components/DataTable.vue'
 import SerialQuickSend from './components/SerialQuickSend.vue'
 import SerialScripts from './components/SerialScript.vue'
 import CanvasPanel from './components/canvasPanel/CanvasPanel.vue'
+import WorkspaceSelector from './components/WorkspaceSelector.vue'
 import { useDark, useToggle } from '@vueuse/core'
+import { useWorkspaceConfig } from './utils/useWorkspaceConfig'
 // @ts-ignore
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
-import { ConfigManager } from './utils/ConfigManager'
+import { WorkspaceManagerInst } from './utils/ProfileManager'
+import type { LayoutConfig } from './components/types'
 
-const configManager = ConfigManager.getInstance()
-const layoutConfig = configManager.useConfig('layout')
+const workspaceManager = WorkspaceManagerInst
+
+onMounted(() => {
+  const urlParams = new URLSearchParams(window.location.search)
+  const workspaceId = urlParams.get('workspace')
+  if (workspaceId) {
+    const exists = workspaceManager.workspacesRef.value.some(w => w.id === workspaceId)
+    if (exists) {
+      workspaceManager.setActiveWorkspace(workspaceId)
+    }
+  }
+})
+
+const defaultLayoutConfig: LayoutConfig = {
+  splitPaneSize: 75,
+  leftActiveTab: '0',
+  rightActiveTab: '0'
+}
+
+const { config: localLayoutConfig } = useWorkspaceConfig<LayoutConfig>('layout', defaultLayoutConfig)
 
 const isDark = useDark({
   initialValue: 'dark',
@@ -39,7 +59,7 @@ const toggleFullscreen = () => {
 }
 
 const handleSplitResize = (options: { size: number}[]) => {
-  layoutConfig.value.splitPaneSize = options[0].size
+  localLayoutConfig.value.splitPaneSize = options[0].size
   handleResize()
 }
 
@@ -47,7 +67,7 @@ const handleTabChange = () => {
   handleResize()
 }
 
-let resizeTimer: number
+let resizeTimer: ReturnType<typeof setTimeout>
 const handleResize = () => {
   clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
@@ -64,7 +84,7 @@ handleResize()
       <div class="header-content">
         <div class="header-left">
           <h1><a href="https://github.com/qdsang/web-serial-debug" target="_blank">Web Serial</a></h1>
-          <SerialConfig class="header-serial-config" />
+          <WorkspaceSelector class="header-workspace-selector" />
         </div>
         <div class="header-links">
           <el-button
@@ -84,8 +104,8 @@ handleResize()
     </el-header>
     <el-container class="main-container">
       <Splitpanes class="default-theme" @resize="handleSplitResize">
-        <Pane :size="layoutConfig.splitPaneSize" class="w75">
-          <el-tabs type="card" class="lv-card lv-tabs" addable v-model="layoutConfig.leftActiveTab" @tab-click="handleTabChange">
+        <Pane :size="localLayoutConfig.splitPaneSize" class="w75">
+          <el-tabs type="card" class="lv-card lv-tabs" addable v-model="localLayoutConfig.leftActiveTab" @tab-click="handleTabChange">
             <el-tab-pane label="控制台">
               <SerialLog />
             </el-tab-pane>
@@ -113,7 +133,7 @@ handleResize()
           </el-tabs>
         </Pane>
         <Pane class="w25">
-          <el-tabs type="card" class="lv-card lv-tabs" v-model="layoutConfig.rightActiveTab">
+          <el-tabs type="card" class="lv-card lv-tabs" v-model="localLayoutConfig.rightActiveTab">
             <el-tab-pane label="快捷发送">
               <SerialQuickSend />
             </el-tab-pane>
@@ -139,8 +159,8 @@ handleResize()
   padding: 0 20px;
   border-bottom: 1px solid var(--el-border-color-light);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  /* backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px); */
 }
 
 .header-content {
@@ -154,6 +174,10 @@ handleResize()
   display: flex;
   align-items: center;
   gap: 24px;
+}
+
+.header-workspace-selector {
+  margin-left: 8px;
 }
 
 .header-content h1 {
@@ -331,6 +355,8 @@ html.dark .el-button {
 }
 .dark .default-theme.splitpanes--vertical>.splitpanes__splitter, 
 .dark .default-theme .splitpanes--vertical>.splitpanes__splitter {
+  width: 4px;
+  background-color: #333 !important;
   border-color: #333;
 }
 </style>

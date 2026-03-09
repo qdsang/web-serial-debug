@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { ConfigManager } from '@/utils/ConfigManager'
+import { ref, watch, computed } from 'vue'
 import ChartPanel from '@/widgets/ChartPanel/ChartPanel.vue'
 import DataTable from '../DataTable.vue'
 import ChartIMU from '@/widgets/ChartIMU/ChartIMU.vue'
@@ -14,9 +13,32 @@ import { GridLayout, GridItem } from 'grid-layout-plus'
 import { useDataStore } from '@/store/dataStore'
 import { useDashboardStore } from '@/store/dashboardStore'
 import { EventCenter, EventNames } from '@/utils/EventCenter'
+import { ProfileManagerInst } from '@/utils/ProfileManager'
+import type { CanvasConfig } from '../types'
 
-const configManager = ConfigManager.getInstance()
-const canvasConfig = configManager.useConfig('canvas')
+const profileManager = ProfileManagerInst
+
+const canvasConfig = computed(() => {
+  const profile = profileManager.activeProfile
+  return profile?.config?.canvas as CanvasConfig | undefined
+})
+
+const defaultCanvasConfig: CanvasConfig = { items: [] }
+
+const localCanvasConfig = computed({
+  get: () => canvasConfig.value || defaultCanvasConfig,
+  set: (val: CanvasConfig) => {
+    const profile = profileManager.activeProfile
+    if (profile) {
+      profileManager.updateProfile(profile.id, {
+        config: {
+          ...profile.config,
+          canvas: { ...val }
+        }
+      })
+    }
+  }
+})
 const dataStore = useDataStore()
 const dashboardStore = useDashboardStore()
 const eventCenter = EventCenter.getInstance()
@@ -101,7 +123,7 @@ const getDefaultTitle = (type: string) => {
   return componentConfigs[type]?.title || '未命名'
 }
 
-const items = ref<CanvasItem[]>(canvasConfig.value?.items?.map(item => ({
+const items = ref<CanvasItem[]>(localCanvasConfig.value?.items?.map(item => ({
   id: item.id,
   type: item.type,
   x: Math.floor(item.x / 50),
@@ -165,7 +187,7 @@ const saveLayout = () => {
     height: item.h * 50,
     title: item.title
   }))
-  configManager.setConfig('canvas', { items: savedItems })
+  localCanvasConfig.value = { items: savedItems }
 }
 
 const handleResize = () => {
