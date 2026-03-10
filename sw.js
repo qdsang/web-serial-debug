@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'bus-tool-cache-v1';
+const CACHE_NAME = 'bus-tool-cache-v2';
 const urlsToCache = [
   './',
   './index.html',
