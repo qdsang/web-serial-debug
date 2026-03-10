@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/tarm/serial"
-	"github.com/webview/webview_go"
+	webview "github.com/webview/webview_go"
 )
 
 type SerialManager struct {
@@ -58,7 +58,7 @@ func (s *SerialManager) GetPorts() []string {
 }
 
 // 初始化串口
-func (s *SerialManager) InitSerial(portName string, baudRate int) error {
+func (s *SerialManager) InitSerial(portName string, baudRate int, dataBits int, stopBits string, parity string, flowControl string) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
@@ -67,8 +67,31 @@ func (s *SerialManager) InitSerial(portName string, baudRate int) error {
 	}
 
 	c := &serial.Config{
-		Name: portName,
-		Baud: baudRate,
+		Name:        portName,
+		Baud:        baudRate,
+		ReadTimeout: 0,
+	}
+
+	if dataBits > 0 {
+		c.Size = byte(dataBits)
+	}
+
+	switch stopBits {
+	case "1":
+		c.StopBits = serial.Stop1
+	case "2":
+		c.StopBits = serial.Stop2
+	case "1.5":
+		c.StopBits = serial.Stop1Half
+	}
+
+	switch parity {
+	case "odd":
+		c.Parity = serial.ParityOdd
+	case "even":
+		c.Parity = serial.ParityEven
+	default:
+		c.Parity = serial.ParityNone
 	}
 
 	port, err := serial.OpenPort(c)

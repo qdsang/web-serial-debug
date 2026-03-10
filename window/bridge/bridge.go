@@ -35,8 +35,8 @@ func (b *Bridge) SetInfluxClient(client influxdb2.Client) {
 }
 
 // 初始化串口
-func (b *Bridge) InitSerial(portName string, baudRate int) error {
-	return b.serialManager.InitSerial(portName, baudRate)
+func (b *Bridge) InitSerial(portName string, baudRate int, dataBits int, stopBits string, parity string, flowControl string) error {
+	return b.serialManager.InitSerial(portName, baudRate, dataBits, stopBits, parity, flowControl)
 }
 
 // 写入串口数据
