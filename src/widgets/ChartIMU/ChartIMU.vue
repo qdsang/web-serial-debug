@@ -498,7 +498,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="model-panel" v-if="!readonly">
+    <div class="model-panel">
       <el-button
         v-for="model in modelOptions"
         :key="model.key"
@@ -511,7 +511,7 @@ onUnmounted(() => {
       <el-button @click="uploadModel" size="small">导入</el-button>
     </div>
 
-    <div class="control-panel" v-if="!readonly">
+    <div class="control-panel">
       <div class="control-section">
         <el-button
           v-for="preset in cameraPresets"

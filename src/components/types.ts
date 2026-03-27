@@ -53,15 +53,23 @@ export interface ChartConfig {
   fields: string[]
 }
 
+export interface CanvasItemConfig {
+  [key: string]: any
+}
+
+export interface CanvasItem {
+  id: number
+  type: string
+  x: number
+  y: number
+  width: number
+  height: number
+  title?: string
+  config?: CanvasItemConfig
+}
+
 export interface CanvasConfig {
-  items: {
-    id: number
-    type: string
-    x: number
-    y: number
-    width: number
-    height: number
-  }[]
+  items: CanvasItem[]
 }
 
 export const defaultChartConfig: { list: ChartConfig[] } = {

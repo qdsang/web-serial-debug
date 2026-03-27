@@ -1,13 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
-import ChartPanel from '@/widgets/ChartPanel/ChartPanel.vue'
-import DataTable from '../DataTable.vue'
-import ChartIMU from '@/widgets/ChartIMU/ChartIMU.vue'
-import PipelinePanel from '@/widgets/PipelinePanel/PipelinePanel.vue'
-import Sim from '@/widgets/Sim/Sim.vue'
-import ChartRocket from '@/widgets/ChartRocket/ChartRocket.vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import TimeRangeControl from './TimeRangeControl.vue'
 import DashboardManager from './DashboardManager.vue'
+import CanvasWidgetWrapper from './CanvasWidgetWrapper.vue'
+import CanvasItemConfigDialog from './CanvasItemConfigDialog.vue'
 import { useDark } from '@vueuse/core'
 import { GridLayout, GridItem } from 'grid-layout-plus'
 import { useDataStore } from '@/store/dataStore'
@@ -65,6 +61,7 @@ interface CanvasItem {
   i: string
   title?: string
   resizable?: boolean
+  config?: Record<string, any>
 }
 
 interface ComponentConfig {
@@ -123,28 +120,49 @@ const getDefaultTitle = (type: string) => {
   return componentConfigs[type]?.title || '未命名'
 }
 
-const items = ref<CanvasItem[]>(localCanvasConfig.value?.items?.map(item => ({
-  id: item.id,
-  type: item.type,
-  x: Math.floor(item.x / 50),
-  y: Math.floor(item.y / 50),
-  w: Math.ceil(item.width / 50),
-  h: Math.ceil(item.height / 50),
-  i: item.id.toString(),
-  title: getDefaultTitle(item.type),
-  resizable: componentConfigs[item.type]?.resizable
-})) || [])
+const loadItemsFromConfig = () => {
+  const configItems = localCanvasConfig.value?.items
+  if (!configItems || !Array.isArray(configItems)) {
+    return []
+  }
+  
+  setTimeout(() => {
+    handleResize()
+  }, 100)
+
+  return configItems.map((item: any) => {
+    const x = typeof item.x === 'number' ? Math.floor(item.x / 50) : 0
+    const y = typeof item.y === 'number' ? Math.floor(item.y / 50) : 0
+    const w = typeof item.width === 'number' ? Math.ceil(item.width / 50) : 4
+    const h = typeof item.height === 'number' ? Math.ceil(item.height / 50) : 4
+    
+    return {
+      id: item.id,
+      type: item.type,
+      x,
+      y,
+      w,
+      h,
+      i: item.id?.toString() || Math.random().toString(),
+      title: item.title || getDefaultTitle(item.type),
+      resizable: componentConfigs[item.type]?.resizable,
+      config: item.config || {}
+    }
+  })
+}
+
+const items = ref<CanvasItem[]>(loadItemsFromConfig())
+
+let ignoreWatch = false
+
+watch(() => profileManager.activeProfile, () => {
+  if (ignoreWatch) return
+  ignoreWatch = true
+  items.value = loadItemsFromConfig()
+  nextTick(() => { ignoreWatch = false })
+})
 
 const isDark = useDark()
-
-const componentMap = {
-  'chart': ChartPanel,
-  'table': DataTable,
-  '3d': ChartIMU,
-  'pipeline': PipelinePanel,
-  'sim': Sim,
-  'rocket': ChartRocket
-} as Record<string, any>
 
 const addComponent = (type: string) => {
   const id = Date.now()
@@ -158,7 +176,8 @@ const addComponent = (type: string) => {
     h: config.height,
     i: id.toString(),
     title: config.title,
-    resizable: config.resizable
+    resizable: config.resizable,
+    config: {}
   }
   items.value.push(newItem)
   saveLayout()
@@ -178,6 +197,7 @@ const removeItem = (id: number) => {
 }
 
 const saveLayout = () => {
+  ignoreWatch = true
   const savedItems = items.value.map(item => ({
     id: item.id,
     type: item.type,
@@ -185,9 +205,11 @@ const saveLayout = () => {
     y: item.y * 50,
     width: item.w * 50,
     height: item.h * 50,
-    title: item.title
+    title: item.title,
+    config: item.config
   }))
   localCanvasConfig.value = { items: savedItems }
+  nextTick(() => { ignoreWatch = false })
 }
 
 const handleResize = () => {
@@ -216,6 +238,36 @@ const saveEdit = () => {
 // @ts-ignore
 const viewItem = (item: CanvasItem) => {
   // TODO: 实现查看功能
+}
+
+const configDialogVisible = ref(false)
+const configItem = ref<{
+  id: number
+  type: string
+  title: string
+  config?: Record<string, any>
+} | null>(null)
+
+const openConfigDialog = (item: CanvasItem) => {
+  configItem.value = {
+    id: item.id,
+    type: item.type,
+    title: item.title || '',
+    config: item.config || {}
+  }
+  configDialogVisible.value = true
+}
+
+const saveItemConfig = (updatedItem: any) => {
+  const index = items.value.findIndex(i => i.id === updatedItem.id)
+  if (index !== -1) {
+    items.value[index] = {
+      ...items.value[index],
+      title: updatedItem.title,
+      config: updatedItem.config
+    }
+    saveLayout()
+  }
 }
 </script>
 
@@ -271,11 +323,8 @@ const viewItem = (item: CanvasItem) => {
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item @click="editItem(item)">
-                    <el-icon><edit /></el-icon>编辑
-                  </el-dropdown-item>
-                  <el-dropdown-item @click="viewItem(item)">
-                    <el-icon><view /></el-icon>查看
+                  <el-dropdown-item @click="openConfigDialog(item)">
+                    <el-icon><setting /></el-icon>配置
                   </el-dropdown-item>
                   <el-dropdown-item @click="removeItem(item.id)" divided>
                     <el-icon><delete /></el-icon>删除
@@ -285,24 +334,18 @@ const viewItem = (item: CanvasItem) => {
             </el-dropdown>
           </div>
           <div class="item-content">
-            <component :is="componentMap[item.type]" />
+            <CanvasWidgetWrapper :type="item.type" :config="item.config" />
           </div>
         </grid-item>
       </grid-layout>
       <TimeRangeControl class="time-range-control" />
     </div>
 
-    <el-dialog v-model="editDialogVisible" title="编辑标题" width="400px">
-      <el-form label-width="80px">
-        <el-form-item label="标题">
-          <el-input v-model="editingItem!.title" placeholder="请输入标题" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveEdit">确定</el-button>
-      </template>
-    </el-dialog>
+    <CanvasItemConfigDialog
+      v-model:visible="configDialogVisible"
+      :item="configItem"
+      @save="saveItemConfig"
+    />
   </div>
 </template>
 
@@ -353,6 +396,9 @@ const viewItem = (item: CanvasItem) => {
   flex-direction: column;
 }
 
+:deep(.vgl-item) {
+  transition: 0s ease;
+}
 :deep(.vgl-item--placeholder) {
   background-color: #444;
   border: 1px solid black;
@@ -410,7 +456,7 @@ const viewItem = (item: CanvasItem) => {
 }
 
 .time-range-control {
-  position: fixed;
+  position: absolute;
   bottom: 0;
   left: 0;
   right: 0;

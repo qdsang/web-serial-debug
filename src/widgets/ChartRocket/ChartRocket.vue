@@ -35,20 +35,64 @@ const angle = ref(waterRocketPhysics.getAngle())
 const isLaunched = ref(false)
 const isMultiStage = ref(true)
 
+// 火箭配置参数
+const stageCount = ref(2)
+const bottleCount = ref(1)
+const separationTime = ref(2)
+
 // 环境参数
 const temperature = ref(20) // 默认温度20°C
 const windSpeed = ref(0)    // 默认无风
 const windDirection = ref(0) // 默认风向0°
 
 // 计算结果
-const velocity = computed(() => waterRocketPhysics.getVelocity())
-const height = computed(() => waterRocketPhysics.getHeight())
-const distance = computed(() => waterRocketPhysics.getDistance())
-const flightTime = computed(() => waterRocketPhysics.getFlightTime())
+const velocity = computed(() => {
+  if (isMultiStage.value) {
+    const physics = multiStageRocketPhysics.getCurrentStagePhysics()
+    return physics ? physics.getVelocity() : 0
+  }
+  return waterRocketPhysics.getVelocity()
+})
+const height = computed(() => {
+  if (isMultiStage.value) {
+    const physics = multiStageRocketPhysics.getCurrentStagePhysics()
+    return physics ? physics.getHeight() : 0
+  }
+  return waterRocketPhysics.getHeight()
+})
+
+const distance = computed(() => {
+  if (isMultiStage.value) {
+    const physics = multiStageRocketPhysics.getCurrentStagePhysics()
+    return physics ? physics.getDistance() : 0
+  }
+  return waterRocketPhysics.getDistance()
+})
+
+const flightTime = computed(() => {
+  if (isMultiStage.value) {
+    const physics = multiStageRocketPhysics.getCurrentStagePhysics()
+    return physics ? physics.getFlightTime() : 0
+  }
+  return waterRocketPhysics.getFlightTime()
+})
 
 // 运动方程
-const equations = computed(() => waterRocketPhysics.getEquations())
-const parameters = computed(() => waterRocketPhysics.getParameterDescriptions())
+const equations = computed(() => {
+  if (isMultiStage.value) {
+    const physics = multiStageRocketPhysics.getCurrentStagePhysics()
+    return physics ? physics.getEquations() : []
+  }
+  return waterRocketPhysics.getEquations()
+})
+
+const parameters = computed(() => {
+  if (isMultiStage.value) {
+    const physics = multiStageRocketPhysics.getCurrentStagePhysics()
+    return physics ? physics.getParameterDescriptions() : []
+  }
+  return waterRocketPhysics.getParameterDescriptions()
+})
 
 const isDark = useDark()
 const sceneBackground = computed(() => isDark.value ? 0x1a1a1a : 0xf0f0f0)
@@ -256,9 +300,12 @@ const animate = () => {
         updateModelAppearance(currentStage, currentConfig)
         
         // 更新位置
-        const physics = multiStageRocketPhysics.stages[currentStage]
-        model.position.x = physics.getDistance() * Math.cos(THREE.MathUtils.degToRad(angle.value))
-        model.position.y = physics.getHeight()
+        const physics = multiStageRocketPhysics.getCurrentStagePhysics()
+        
+        if (physics) {
+          model.position.x = physics.getDistance() * Math.cos(THREE.MathUtils.degToRad(angle.value))
+          model.position.y = physics.getHeight()
+        }
       }
     } else {
       waterRocketPhysics.update(delta)
@@ -382,19 +429,19 @@ const getConfig = () => {
 const setConfig = (config: Record<string, any>) => {
   if (config.temperature !== undefined) {
     temperature.value = config.temperature
-    handleTemperatureChange()
+    handleTemperatureChange(config.temperature)
   }
   if (config.windSpeed !== undefined) {
     windSpeed.value = config.windSpeed
-    handleWindSpeedChange()
+    handleWindSpeedChange(config.windSpeed)
   }
   if (config.windDirection !== undefined) {
     windDirection.value = config.windDirection
-    handleWindDirectionChange()
+    handleWindDirectionChange(config.windDirection)
   }
   if (config.angle !== undefined) {
     angle.value = config.angle
-    handleAngleChange()
+    handleAngleChange(config.angle)
   }
   if (config.isMultiStage !== undefined) {
     isMultiStage.value = config.isMultiStage
@@ -425,6 +472,29 @@ onUnmounted(() => {
   <div class="chart-3d-container">
     <div ref="container" class="canvas-container"></div>
     <div class="control-panel" v-if="!readonly">
+      <div class="parameters">
+        <h3>火箭参数</h3>
+        <div class="parameter-item">
+          <label>级数</label>
+          <el-slider v-model="stageCount" :min="1" :max="3" :step="1" @change="handleStageCountChange" />
+        </div>
+        <div class="parameter-item">
+          <label>并联瓶数</label>
+          <el-slider v-model="bottleCount" :min="1" :max="6" :step="1" @change="handleBottleCountChange" />
+        </div>
+        <div class="parameter-item">
+          <label>水量 (ml)</label>
+          <el-slider v-model="waterVolume" :min="100" :max="2000" :step="50" @change="handleWaterVolumeChange" />
+        </div>
+        <div class="parameter-item">
+          <label>压力 (bar)</label>
+          <el-slider v-model="pressure" :min="1" :max="10" :step="0.5" @change="handlePressureChange" />
+        </div>
+        <div class="parameter-item" v-if="stageCount > 1">
+          <label>分离时间 (s)</label>
+          <el-slider v-model="separationTime" :min="1" :max="10" :step="0.5" @change="handleSeparationTimeChange" />
+        </div>
+      </div>
       <div class="parameters">
         <h3>环境参数</h3>
         <div class="parameter-item">
